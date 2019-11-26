@@ -16,6 +16,11 @@
 #' @param diffTol Tolerance of model covergence
 #'
 #' @return beta and sigma pars
+#' @examples
+#' df = simuData
+#' mkt = market
+#'
+#' aggrFit = aggrmodel(data = df, market = mkt, Y = Load, timeVar = Time, groupVar = Group, repVar = Rep, n_basis = 7)
 
 aggrmodel <- function(formula=NULL,
                       data,
