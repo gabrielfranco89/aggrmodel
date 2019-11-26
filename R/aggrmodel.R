@@ -17,8 +17,9 @@
 #'
 #' @return beta and sigma pars
 #' @examples
-#' df = simuData
-#' mkt = market
+#' df = subset(simuData, Cluster==1)
+#' mkt = subset(market, Cluster==1)
+#' mkt = subset(mkt, select=-Cluster)
 #'
 #' aggrFit = aggrmodel(data = df, market = mkt, Y = Load, timeVar = Time, groupVar = Group, repVar = Rep, n_basis = 7)
 
@@ -163,7 +164,7 @@ aggrmodel <- function(formula=NULL,
         parOut <- opt$par
         lkOut <- opt$value
 
-        message('\nLikehood =', lkOut)
+        ## message('\nLikehood =', lkOut)
 
         ## W.2 Update Sigma estimates
         if(covType == 'Homog_Uniform'){
@@ -194,7 +195,7 @@ aggrmodel <- function(formula=NULL,
                                           simplify=FALSE))
             betaLeft <- t(X)%*%sigmaInv%*%X
             betaRight <- t(X)%*%sigmaInv%*%y
-            betaOut <- solve(betaLeft, betaRight)
+            betaOut <- Matrix::solve(betaLeft, betaRight)
         } ## end if/else cicle
 
 

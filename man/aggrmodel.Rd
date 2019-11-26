@@ -54,8 +54,9 @@ beta and sigma pars
 Fit Aggregated Model
 }
 \examples{
-df = simuData
-mkt = market
+df = subset(simuData, Cluster==1)
+mkt = subset(market, Cluster==1)
+mkt = subset(mkt, select=-Cluster)
 
 aggrFit = aggrmodel(data = df, market = mkt, Y = Load, timeVar = Time, groupVar = Group, repVar = Rep, n_basis = 7)
 }
