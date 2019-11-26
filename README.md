@@ -6,7 +6,7 @@ A R Package for aggregated data
 
 You should install it directly from github
 
-```
+``` r
 install.packages('devtools') ## if not installed
 library(devtools)
 install_github("gabrielfranco89/aggrmodel")
@@ -14,7 +14,7 @@ install_github("gabrielfranco89/aggrmodel")
 
 ## Examples
 
-```
+``` r
 library(aggrmodel)
 
 ## Load datasets
