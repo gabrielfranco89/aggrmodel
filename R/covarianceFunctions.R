@@ -47,16 +47,16 @@ createCorBase <- function(timeVec){
 periodicCorMtx <- function(timeVec,
                            corPar,
                            truncateDec = NULL){
-    require(Matrix)
-    
-    baseMtx <- createCorBase(timeVec) / max(timeVec)
-    
-    mtx <- apply(baseMtx, 2, function(x) exp(-2* (sin(pi*x)^2)/corPar^2 ))
+    ## require(Matrix)
+
+    baseMtx <- createCorBase(timeVec)
+
+    mtx <- apply(baseMtx, 2, function(x) exp(-2* (sin(pi*x)^2)*corPar^2 ))
 
     if(!is.null(truncateDec)) mtx <- round(mtx,truncateDec)
 
-    mtx <- as(mtx, 'symmetricMatrix')
-    
+    ## mtx <- as(mtx, 'symmetricMatrix')
+
     return(mtx)
 
 }
@@ -70,7 +70,7 @@ periodicCorMtx <- function(timeVec,
 #' @param corPar Covariance parameter
 #' @param truncateDec Decimal to be truncated. Default is none.
 #'
-#' @details 
+#' @details
 #' Create a covariance matrix of type \emph{exponential} with elements
 #'
 #' \deqn{r(s,t | \theta) = exp \left\{-2\theta\, \left(\frac{|t-s|}{T}\right) \right\}.}
@@ -82,16 +82,16 @@ periodicCorMtx <- function(timeVec,
 #' expCorMtx(myTime, corPar = 8, truncateDec = 4)
 expCorMtx <- function(timeVec, corPar,
                       truncateDec = NULL){
-    require(Matrix)
-    
-    baseMtx <- createCorBase(timeVec) / max(timeVec)
-    
-    mtx <- apply(baseMtx, 2, function(x) exp(-abs(x)))
+    ## require(Matrix)
+
+    baseMtx <- createCorBase(timeVec)
+
+    mtx <- apply(baseMtx, 2, function(x) exp(-abs(x)*corPar))
 
     if(!is.null(truncateDec)) mtx <- round(mtx,truncateDec)
 
-    mtx <- as(mtx, 'symmetricMatrix')
-    
+    ## mtx <- as(mtx, 'symmetricMatrix')
+
     return(mtx)
 
 }
@@ -115,10 +115,10 @@ expCorMtx <- function(timeVec, corPar,
 createVarMtx <- function(functionalVec,
                             sigPar,
                             tauPar){
-    require(Matrix)
-   
+##    require(Matrix)
+
     diagVec = sigPar*(functionalVec^(-tauPar))
-    mtx <- Diagonal(x=diagVec)
+    mtx <- diag(x=diagVec, names=FALSE)
 
     return(mtx)
 
@@ -126,8 +126,8 @@ createVarMtx <- function(functionalVec,
 
 
 ######################################################################
-#   ____             ____  _                   _                       
-#  / ___|_____   __ / ___|| |_ _ __ _   _  ___| |_ _   _ _ __ ___  ___ 
+#   ____             ____  _                   _
+#  / ___|_____   __ / ___|| |_ _ __ _   _  ___| |_ _   _ _ __ ___  ___
 # | |   / _ \ \ / / \___ \| __| '__| | | |/ __| __| | | | '__/ _ \/ __|
 # | |__| (_) \ V /   ___) | |_| |  | |_| | (__| |_| |_| | | |  __/\__ \
 #  \____\___/ \_/   |____/ \__|_|   \__,_|\___|\__|\__,_|_|  \___||___/
@@ -161,7 +161,7 @@ createVarMtx <- function(functionalVec,
 #' mkt = data.frame(group = rep(1:3, each=2),
 #'                  type = rep(1:2, times = 3),
 #'                  value = sample(1:20, 6))
-#' 
+#'
 #' myTimevec = seq(0,1, length.out = 4)
 #' mySigPar = matrix(c(2,3), ncol=2)
 #' myTauPar = matrix(c(.2, .2), ncol=2)
@@ -170,7 +170,7 @@ createVarMtx <- function(functionalVec,
 #'
 #' ## Homogeneous example
 #' homogMtx = covMatrix(market = mkt, group.name = 'group', type.name = 'type', mkt.name = 'value', timeVec = myTimevec, sigPar = mySigPar, tauPar = myTauPar, corPar = myTauPar, covType = 'Homog', corType = 'periodic')
-#' 
+#'
 covMatrix <- function(market,
                       group.name,
                       type.name,
@@ -183,22 +183,22 @@ covMatrix <- function(market,
                       covType,
                       corType = 'periodic',
                       nKnots = NULL,
-                      truncateDec = NULL                      
+                      truncateDec = NULL
                       ){
     require(Matrix)
     require(dplyr)
+    require(purrr)
+    require(tidyr)
 
     ## Preamble
-    renamer <- c('group' = group.name,
-                 'type' = type.name,
-                 'num' = mkt.name)
-    
-    myMkt <- market %>%
-        select(renamer) 
-               
 
-    t = timeVec
-    T = length(timeVec)
+
+    myMkt <- market
+    colnames(myMkt) = c('group', 'type', 'num')
+
+
+    t = unique(timeVec)
+    T = length(t)
     C = length(unique(myMkt$type))
     J = length(unique(myMkt$group))
 
@@ -217,7 +217,7 @@ covMatrix <- function(market,
         if(any(length(sigPar) != 1,
                length(corPar) != 1))
             stop('Please, check number of parameters for homogeneous uniform model!')
-        
+
 
         vc <- createVarMtx(functionalVec = rep(1,T),
                            sigPar = sigPar,
@@ -234,17 +234,14 @@ covMatrix <- function(market,
                             truncateDec = Par)
 
         covMtx  <- vc %*% cc %*% vc
-            
-        covMtxList = lapply(mktComp,
-                     function(mj, cMtx){
-                         mm = apply(as.matrix(mj),
-                                    1,
-                                    function(mjc) mjc * cMtx)
-                         return(Reduce('+', mm))
-                     },
-                     cMtx = covMtx
-                     )
-        
+
+        covMtxList <- tapply(market[,3], market[,1],
+                       function(m){
+                           tmp <- lapply(m, function(mjc) mjc*covMtx)
+                           Reduce('+', tmp)
+                       })
+
+
     } # end if homog unif
 
 
@@ -254,7 +251,7 @@ covMatrix <- function(market,
      if(any(length(sigPar) != C,
             length(corPar) != C))
             stop('Please, check number of parameters for homogeneous model!')
-        
+
 
 
         covMtxListC <- lapply(1:C,
@@ -275,13 +272,13 @@ covMatrix <- function(market,
                                                       truncateDec = trc)
 
                                   return( vc %*% cc %*% vc)
-                                  
+
                               },
                               corParIn = corPar,
                               sigParIn = sigPar,
                               trc = truncateDec,
                               t=t)
-            
+
         covMtxList = lapply(mktComp,
                      function(mj, cMtx, C){
                          mm = lapply(1:C,
@@ -291,7 +288,7 @@ covMatrix <- function(market,
                      cMtx = covMtxListC,
                      C=C
                      )
-    
+
     } # end if homog
 
     ## Heterogeneous ::::::::::::::::::::::::::::::::::::
@@ -299,7 +296,7 @@ covMatrix <- function(market,
 
         ## NOTE ----------------------------------------
         ##   The object funcVec must be a matrix TxC of fitted tipologies.
-        ##   Can be any functional of representation Tx1. This allows 
+        ##   Can be any functional of representation Tx1. This allows
         ##     heterogeneous variance structures as in
         ##     Dias, Garcia, Schmidt (2011)
 
@@ -308,7 +305,7 @@ covMatrix <- function(market,
                nrow(funcMtx) != T,
                length(corPar) != C))
             stop('Please, check number of parameters for proportional model!')
-        
+
 
         covMtxListC <- lapply(1:C,
                               function(c, sigParIn, corParIn,
@@ -330,7 +327,7 @@ covMatrix <- function(market,
                                                       truncateDec = trc)
 
                                   return( vc %*% cc %*% vc)
-                                  
+
                               },
                               corParIn = corPar,
                               sigParIn = sigPar,
@@ -338,7 +335,7 @@ covMatrix <- function(market,
                               funcVecIn = funcMtx,
                               trc = truncateDec,
                               t=t)
-            
+
         covMtxList = lapply(mktComp,
                      function(mj, cMtx, C){
                          mm = lapply(1:C,
@@ -348,11 +345,11 @@ covMatrix <- function(market,
                      cMtx = covMtxListC,
                      C=C
                      )
-    
+
     } # end if hetero
 
     return(covMtxList)
-    
+
 
 }
 

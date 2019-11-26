@@ -26,7 +26,6 @@ buildX <- function(market,
     ## Preamble
     require(fda)
     require(tidyr)
-    
     C <- length(unique(market[,2]))
     J <- length(unique(market[,1]))
 
@@ -36,15 +35,13 @@ buildX <- function(market,
                                     nbasis = n_basis,
                                     norder = n_order)
     B = predict(basisObj, t)
-
-    ## Kronecker product with market
+    
+    ## Kronecker product with market    
     X <- tapply(market[,3],
                 market[,1],
-                FUN=function(m){ t(m) %x% B},
+                FUN=function(m) t(m) %x% B,
                 simplify=FALSE)
-
     return(X)        
-
 }
 
 #' Compute log-likelihood for aggregated model
@@ -68,7 +65,7 @@ logLikelihood <- function(data,
     grps <- unique(data[,1])
 
     ## Sort data to match time, group and replicates
-    data <- data[order(data[,1], data[,2], data[,3]),]
+    ##    data <- data[order(data[,1], data[,2], data[,3]),]
     
     sumLogLik <- 0
     for(j in grps){
@@ -76,9 +73,10 @@ logLikelihood <- function(data,
         subData <- subset(data, data[,1]==j)
         
         actualMu <- muVecList[[j]]
-        actualSigma <- covMtxList[[j]]
+        actualSigma <- as.matrix(covMtxList[[j]])
 
-        logLik <- tapply(subData[,4], subdata[,2],
+
+        logLik <- tapply(subData[,4], subData[,2],
                          FUN=dmvnorm,
                          mean = actualMu,
                          sigma = actualSigma,
@@ -88,7 +86,45 @@ logLikelihood <- function(data,
         
     }
 
-    return(sumLogLik)
+    return(-sumLogLik)
     
 
+}
+
+
+
+loglikWrapper <- function(pars,
+                          dataWrap,
+                          mktWrap,
+                          covWrap,
+                          corWrap,
+                          betaWrap,
+                          designListWrap,
+                          nCons){
+
+    
+
+
+    muList <- lapply(designListWrap,
+                     function(x) x %*% betaWrap)
+
+    if(covWrap == 'Homog_Uniform'){
+
+        sigmaList <- covMatrix(market = mktWrap,
+                               group.name = 'Group',
+                               type.name = 'type',
+                               mkt.name = 'mkt',
+                               timeVec = dataWrap$time,
+                               sigPar = pars[1],
+                               corPar = pars[2],
+                               covType = 'Homog_Uniform',
+                               corType = corWrap )
+
+    }
+
+    lk <- logLikelihood(data = dataWrap,
+                        muVecList = muList,
+                        covMtxList = sigmaList)
+
+    return(lk)
 }
