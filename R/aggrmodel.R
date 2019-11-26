@@ -44,10 +44,8 @@ aggrmodel <- function(formula=NULL,
     corFlag = corType %in% c('periodic', 'exponential')
     if(!corFlag)
         stop("Wrong corType option! Argument must be periodic or exponential.")
-    
+
     ## Preamble
-    source('likelihoodFunctions.R')
-    source('covarianceFunctions.R')
     require(Matrix)
 
 
@@ -73,7 +71,7 @@ aggrmodel <- function(formula=NULL,
     if(ncol(market) != 3)
         stop('Market must have 3 columns in the following order: Group, Type and Number of subjects. Please check your market input.')
 
-    
+
 
 
     ## Build disgragation basis expansion design matrix
@@ -89,7 +87,7 @@ aggrmodel <- function(formula=NULL,
                                              simplify=FALSE)
                              )
                  )
-    
+
     bb <- do.call(rbind, bb)
     bb <- cbind(dd, bb)
     bb <- bb[,-c(1:3)]
@@ -129,9 +127,9 @@ aggrmodel <- function(formula=NULL,
                          each=n_basis),
                      function(b) B %*% b)
 
-        ## <-- Under construction       
-                
-        
+        ## <-- Under construction
+
+
         sigPar <- rep(sigma_init,C)
         corPar <- rep(-180, C)
         tauPar <- rep(.5, C)
@@ -140,7 +138,7 @@ aggrmodel <- function(formula=NULL,
         ## -->
 
     }
-    
+
     ## While preamble
     betaIn = beta_init
     lkDiff = diffTol + 1
@@ -184,7 +182,7 @@ aggrmodel <- function(formula=NULL,
         sigmaInvList <- lapply(sigmaOutList, qr.solve)
         ## W.3 Obtain beta estimates with previous steps
         if(cicleRep){
-        ## Note: Here we use a(0) = a(T) restriction            
+        ## Note: Here we use a(0) = a(T) restriction
         } else {
             sigmaInv <- bdiag(sigmaInvList)
             sigmaInv <- bdiag(replicate(n=I,
@@ -211,7 +209,7 @@ aggrmodel <- function(formula=NULL,
 
     return(list('beta' = betaOut,
                 'pars' = parOut))
-    
+
 
 
 
