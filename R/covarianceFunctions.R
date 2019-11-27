@@ -118,7 +118,7 @@ createVarMtx <- function(functionalVec,
 ##    require(Matrix)
 
     diagVec = sigPar*(functionalVec^(-tauPar))
-    mtx <- diag(x=diagVec, names=FALSE)
+    mtx <- diag(x=diagVec) ##, names=FALSE)
 
     return(mtx)
 
