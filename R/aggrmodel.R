@@ -47,7 +47,7 @@ aggrmodel <- function(formula=NULL,
         stop("Wrong corType option! Argument must be periodic or exponential.")
 
     ## Preamble
-    require(Matrix)
+    require(Matrix,quietly=TRUE)
 
 
     y = data[[substitute(Y)]]
@@ -118,7 +118,7 @@ aggrmodel <- function(formula=NULL,
     if(covType == 'Heterog'){
 
         ## Get mean curves
-        require(fda)
+        require(fda,quietly=TRUE)
         basisObj = create.bspline.basis(range(t),
                                         nbasis = n_basis,
                                         norder = n_order)

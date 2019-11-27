@@ -185,10 +185,10 @@ covMatrix <- function(market,
                       nKnots = NULL,
                       truncateDec = NULL
                       ){
-    require(Matrix)
-    require(dplyr)
-    require(purrr)
-    require(tidyr)
+    require(Matrix,quietly=TRUE)
+    require(dplyr,quietly=TRUE)
+    require(purrr,quietly=TRUE)
+    require(tidyr,quietly=TRUE)
 
     ## Preamble
 

@@ -24,8 +24,8 @@ buildX <- function(market,
                    ){
 
     ## Preamble
-    require(fda)
-    require(tidyr)
+    require(fda, quietly=TRUE)
+    require(tidyr, quietly=TRUE)
     C <- length(unique(market[,2]))
     J <- length(unique(market[,1]))
 
@@ -60,7 +60,7 @@ logLikelihood <- function(data,
                           covMtxList){
 
     ## Preamble
-    require(mvtnorm)
+    require(mvtnorm, quietly=TRUE)
 
     grps <- unique(data[,1])
 
