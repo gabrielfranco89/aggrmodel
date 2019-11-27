@@ -1,11 +1,11 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
-aggrmodel
-=========
+aggrmodel <img src='man/figures/logo.png' align="right" height="139" />
+=======================================================================
 
 <!-- badges: start -->
 <!-- badges: end -->
-The goal of aggrmodel is to ...
+A R package to fit aggregated data model.
 
 Installation
 ------------
@@ -29,5 +29,11 @@ df = subset(simuData, Cluster==1)
 mkt = subset(market, Cluster==1)
 mkt = subset(mkt, select=-Cluster)
 
-aggrFit = aggrmodel(data = df, market = mkt, Y = Load, timeVar = Time, groupVar = Group, repVar = Rep, n_basis = 7)
+aggrFit = aggrmodel(data = df,        ## Your data
+                    market = mkt,     ## Data market
+                    Y = Load,         ## Dep. variable
+                    timeVar = Time,   ## Time variable
+                    groupVar = Group, ## Group variable
+                    repVar = Rep,     ## Replicate variable
+                    n_basis = 7)      ## Number of B-Splines funcions
 ```
