@@ -9,7 +9,7 @@ logLikelihood(data, muVecList, covMtxList)
 \arguments{
 \item{data}{Data Frame with 4 columns in the following order: Group, Replicates, Time, Signal}
 
-\item{muVecList}{List of X\beta for each group}
+\item{muVecList}{List of \eqn{X\beta} for each group}
 
 \item{covMatrixList}{List of covariance matrices for each group}
 }

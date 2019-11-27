@@ -50,7 +50,7 @@ buildX <- function(market,
 #'
 #'
 #' @param data Data Frame with 4 columns in the following order: Group, Replicates, Time, Signal
-#' @param muVecList List of X\beta for each group
+#' @param muVecList List of \eqn{X\beta} for each group
 #' @param covMatrixList List of covariance matrices for each group
 #'
 #' @return Log-likehood value
