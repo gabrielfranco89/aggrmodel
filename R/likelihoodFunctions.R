@@ -3,6 +3,7 @@
 #' @name buildX
 #' @param market Market data frame. MUST be a 3 column dataframe with the following order: Group, Type and Number of subjects
 #' @param timeVec Vector of sampled times
+#' @param basis Character indicating which basis: 'B-Splines' or 'Fourier'
 #' @param n_basis Number of basis functions for basis expansion
 #' @param n_order Order of basis splines (Default: 4)
 #'
@@ -20,6 +21,7 @@
 buildX <- function(market,
                    timeVec,
                    n_basis,
+                   basis = 'B-Splines',
                    n_order = 4 ## Cubic Splines (default)
                    ){
 
@@ -31,9 +33,14 @@ buildX <- function(market,
 
     ## Create basis matrix B
     t <- unique(timeVec)
-    basisObj = create.bspline.basis(range(t),
-                                    nbasis = n_basis,
-                                    norder = n_order)
+    if(basis=='B-Splines')
+        basisObj = create.bspline.basis(range(t),
+                                        nbasis = n_basis,
+                                        norder = n_order)
+    if(basis=='Fourier'){
+        basisObj = create.fourier.basis(range(t),
+                                        nbasis = n_basis)
+    }
     B = predict(basisObj, t)
     
     ## Kronecker product with market    

@@ -4,7 +4,7 @@
 \alias{buildX}
 \title{Build design matrix to fit aggregated model}
 \usage{
-buildX(market, timeVec, n_basis, n_order = 4)
+buildX(market, timeVec, n_basis, basis = "B-Splines", n_order = 4)
 }
 \arguments{
 \item{market}{Market data frame. MUST be a 3 column dataframe with the following order: Group, Type and Number of subjects}
@@ -12,6 +12,8 @@ buildX(market, timeVec, n_basis, n_order = 4)
 \item{timeVec}{Vector of sampled times}
 
 \item{n_basis}{Number of basis functions for basis expansion}
+
+\item{basis}{Character indicating which basis: 'B-Splines' or 'Fourier'}
 
 \item{n_order}{Order of basis splines (Default: 4)}
 }

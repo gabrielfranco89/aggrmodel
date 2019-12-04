@@ -8,6 +8,7 @@
 #' @param timeVar Name of time variable
 #' @param groupVar Name of grouping variable
 #' @param repVar Name of replicates variable
+#' @param basisFunction Character indicating which basis: 'B-Splines' or 'Fourier'
 #' @param n_basis Number of basis functions for basis expansion
 #' @param n_order Order of basis Splines (Default: 4)
 #' @param cicleRep Indicator TRUE/FALSE if replicates are cyclical
@@ -31,6 +32,7 @@ aggrmodel <- function(formula=NULL,
                       groupVar,
                       repVar,
                       n_basis,
+                      basisFunction = 'B-Splines',
                       cicleRep = FALSE,
                       n_order = 4,
                       covType = 'Homog_Uniform',
@@ -73,9 +75,10 @@ aggrmodel <- function(formula=NULL,
 
     ## Build disgragation basis expansion design matrix
     XList <- buildX(market=market,
-                         timeVec = t,
-                         n_basis = n_basis,
-                         n_order = n_order)
+                    timeVec = t,
+                    n_basis = n_basis,
+                    n_order = n_order,
+                    basis = basisFunction)
     bb <- lapply(XList,
                  function(x)
                      do.call(rbind,replicate(n=I,

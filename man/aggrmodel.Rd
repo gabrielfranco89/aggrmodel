@@ -13,6 +13,7 @@ aggrmodel(
   groupVar,
   repVar,
   n_basis,
+  basisFunction = "B-Splines",
   cicleRep = FALSE,
   n_order = 4,
   covType = "Homog_Uniform",
@@ -36,6 +37,8 @@ aggrmodel(
 \item{repVar}{Name of replicates variable}
 
 \item{n_basis}{Number of basis functions for basis expansion}
+
+\item{basisFunction}{Character indicating which basis: 'B-Splines' or 'Fourier'}
 
 \item{cicleRep}{Indicator TRUE/FALSE if replicates are cyclical}
 
