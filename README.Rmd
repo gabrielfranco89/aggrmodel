@@ -44,6 +44,6 @@ aggrFit = aggrmodel(data = df,        ## Your data
                     timeVar = Time,   ## Time variable
                     groupVar = Group, ## Group variable
                     repVar = Rep,     ## Replicate variable
-                    n_basis = 7)      ## Number of B-Splines funcions
+                    n_basis = 7)      ## Number of basis functions
 
 ```
