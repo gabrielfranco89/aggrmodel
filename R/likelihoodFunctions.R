@@ -101,15 +101,9 @@ loglikWrapper <- function(pars,
                           betaWrap,
                           designListWrap,
                           nCons){
-
-    
-
-
     muList <- lapply(designListWrap,
                      function(x) x %*% betaWrap)
-
     if(covWrap == 'Homog_Uniform'){
-
         sigmaList <- covMatrix(market = mktWrap,
                                group.name = 'Group',
                                type.name = 'type',
@@ -119,12 +113,21 @@ loglikWrapper <- function(pars,
                                corPar = pars[2],
                                covType = 'Homog_Uniform',
                                corType = corWrap )
-
     }
-
+    if(covWrap == 'Homog'){
+        C <- length(unique(mktWrap[,2]))
+        sigmaList <- covMatrix(market = mktWrap,
+                                  group.name = 'Group',
+                                  type.name = 'type',
+                                  mkt.name = 'mkt',
+                                  timeVec = dataWrap$time,
+                                  sigPar = pars[1:C],
+                                  corPar = pars[(C+1):(2*C)],
+                                  covType = 'Homog',
+                                  corType = corWrap )
+    }
     lk <- logLikelihood(data = dataWrap,
                         muVecList = muList,
                         covMtxList = sigmaList)
-
     return(lk)
 }

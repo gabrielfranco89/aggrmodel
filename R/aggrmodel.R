@@ -49,7 +49,6 @@ aggrmodel <- function(formula=NULL,
     ## Preamble
     require(Matrix,quietly=TRUE)
 
-
     y = data[[substitute(Y)]]
     t = data[[substitute(timeVar)]]
     t = t/max(t)
@@ -72,15 +71,11 @@ aggrmodel <- function(formula=NULL,
     if(ncol(market) != 3)
         stop('Market must have 3 columns in the following order: Group, Type and Number of subjects. Please check your market input.')
 
-
-
-
     ## Build disgragation basis expansion design matrix
     XList <- buildX(market=market,
                          timeVec = t,
                          n_basis = n_basis,
                          n_order = n_order)
-
     bb <- lapply(XList,
                  function(x)
                      do.call(rbind,replicate(n=I,
@@ -88,17 +83,14 @@ aggrmodel <- function(formula=NULL,
                                              simplify=FALSE)
                              )
                  )
-
     bb <- do.call(rbind, bb)
     bb <- cbind(dd, bb)
     bb <- bb[,-c(1:3)]
-
     fit_init <- lm(y~.-1, data = bb)
     beta_init <- coef(fit_init)
     sigma_init <- sqrt(summary(fit_init)$sigma)
 
     ## Step 1: obtain Sigma estimates
-
     ## 1.1 Create parVec according to covType and corType
     if(covType == 'Homog_Uniform'){
         sigPar <- sigma_init
@@ -110,13 +102,11 @@ aggrmodel <- function(formula=NULL,
     if(covType == 'Homog'){
         sigPar <- rep(sigma_init,C)
         corPar <- rep(180, C)
-
         parIn <- c(sigPar, corPar)
         lowBoundVec <- c(rep(-Inf,C), rep(0,C))
     }
 
     if(covType == 'Heterog'){
-
         ## Get mean curves
         require(fda,quietly=TRUE)
         basisObj = create.bspline.basis(range(t),
@@ -160,15 +150,12 @@ aggrmodel <- function(formula=NULL,
                      nCons = C,
                      lower = lowBoundVec,
                      method = "L-BFGS-B")
-
         parOut <- opt$par
         lkOut <- opt$value
-
         ## message('\nLikehood =', lkOut)
 
         ## W.2 Update Sigma estimates
         if(covType == 'Homog_Uniform'){
-
             sigmaOutList <- covMatrix(market = market,
                                       group.name = 'Group',
                                       type.name = 'type',
@@ -178,8 +165,19 @@ aggrmodel <- function(formula=NULL,
                                       corPar = parOut[2],
                                       covType = 'Homog_Uniform',
                                       corType = corType )
-
         }
+        if(covType == 'Homog'){
+            sigmaOutList <- covMatrix(market = market,
+                                      group.name = 'Group',
+                                      type.name = 'type',
+                                      mkt.name = 'mkt',
+                                      timeVec = dd$time,
+                                      sigPar = parOut[1:C],
+                                      corPar = parOut[(C+1):(2*C)],
+                                      covType = 'Homog',
+                                      corType = corType )
+        }
+        
         sigmaInvList <- lapply(sigmaOutList, qr.solve)
         ## W.3 Obtain beta estimates with previous steps
         if(cicleRep){
@@ -198,22 +196,34 @@ aggrmodel <- function(formula=NULL,
             betaOut <- Matrix::solve(betaLeft, betaRight)
         } ## end if/else cicle
 
-
         ## W.4 UPDATES
         lkDiff <- abs(lkOut - lkIn)
         betaIn <- as.numeric(betaOut)
         parIn  <- parOut
         lkIn <- lkOut
-
     } ## End while(lkDiff > diffTol)
 
+    ## Output Mean curves
+    basisObj = create.bspline.basis(range(t),
+                                    nbasis = n_basis,
+                                    norder = n_order)
+    B = predict(basisObj, t)
+    ## Separate betas
+    betaMtx <- cbind(beta=as.matrix(betaOut),
+                     type=rep(1:C, each=n_basis))
+    mcMtx <- tapply(betaMtx[,1],
+                    betaMtx[,2],
+                    function(x) B %*% x)
+    mcMtx <- data.frame(mc=unlist(mcMtx),
+                        time=rep(t,times=C),
+                        type=rep(unique(market[,2]), each=length(t)))
 
-    return(list('beta' = betaOut,
-                'pars' = parOut))
-
-
-
-
+    ## Return
+    return(list('beta' = as.matrix(betaOut),
+                'pars' = parOut,
+                'mc' = mcMtx,
+                'n_basis' = n_basis,
+                'n_order' = n_order))
 }
 
 

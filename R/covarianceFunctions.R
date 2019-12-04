@@ -115,13 +115,9 @@ expCorMtx <- function(timeVec, corPar,
 createVarMtx <- function(functionalVec,
                             sigPar,
                             tauPar){
-##    require(Matrix)
-
     diagVec = sigPar*(functionalVec^(-tauPar))
     mtx <- diag(x=diagVec) ##, names=FALSE)
-
     return(mtx)
-
 }
 
 
@@ -191,12 +187,8 @@ covMatrix <- function(market,
     require(tidyr,quietly=TRUE)
 
     ## Preamble
-
-
     myMkt <- market
     colnames(myMkt) = c('group', 'type', 'num')
-
-
     t = unique(timeVec)
     T = length(t)
     C = length(unique(myMkt$type))
@@ -213,47 +205,33 @@ covMatrix <- function(market,
 
     ## Homog Unif ::::::::::::::::::::::::::::::
     if(covType == 'Homog_Uniform'){
-
         if(any(length(sigPar) != 1,
                length(corPar) != 1))
             stop('Please, check number of parameters for homogeneous uniform model!')
-
-
         vc <- createVarMtx(functionalVec = rep(1,T),
                            sigPar = sigPar,
                            tauPar = 0)
-
         if(corType == 'periodic')
             cc <- periodicCorMtx(timeVec = t,
                                  corPar = corPar,
                                  truncateDec = truncateDec)
-
         if(corType == 'exponential')
             cc <- expCorMtx(timeVec = t,
                             corPar = corPar,
                             truncateDec = Par)
-
         covMtx  <- vc %*% cc %*% vc
-
         covMtxList <- tapply(market[,3], market[,1],
                        function(m){
                            tmp <- lapply(m, function(mjc) mjc*covMtx)
                            Reduce('+', tmp)
                        })
-
-
     } # end if homog unif
-
 
     ## Homog ::::::::::::::::::::::::::::::::::::::::
     if(covType == 'Homog'){
-
      if(any(length(sigPar) != C,
             length(corPar) != C))
             stop('Please, check number of parameters for homogeneous model!')
-
-
-
         covMtxListC <- lapply(1:C,
                               function(c, sigParIn, corParIn, trc, t){
 
@@ -278,7 +256,6 @@ covMatrix <- function(market,
                               sigParIn = sigPar,
                               trc = truncateDec,
                               t=t)
-
         covMtxList = lapply(mktComp,
                      function(mj, cMtx, C){
                          mm = lapply(1:C,
@@ -288,7 +265,6 @@ covMatrix <- function(market,
                      cMtx = covMtxListC,
                      C=C
                      )
-
     } # end if homog
 
     ## Heterogeneous ::::::::::::::::::::::::::::::::::::
