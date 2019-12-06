@@ -47,6 +47,8 @@ aggrmodel <- function(formula=NULL,
     corFlag = corType %in% c('periodic', 'exponential')
     if(!corFlag)
         stop("Wrong corType option! Argument must be periodic or exponential.")
+    if(basisFunction == 'Fourier' && n_basis%%2!=1)
+        stop('For Fourier basis, n_basis must be an odd number!')
 
     ## Preamble
     require(Matrix,quietly=TRUE)
@@ -208,19 +210,50 @@ aggrmodel <- function(formula=NULL,
         
         sigmaInvList <- lapply(sigmaOutList, qr.solve)
         ## W.3 Obtain beta estimates with previous steps
+
+        sigmaInv <- bdiag(sigmaInvList)
+        sigmaInv <- bdiag(replicate(n=I,
+                                    expr=sigmaInv,
+                                    simplify=FALSE))
+        X <- do.call(rbind, XList)
+        X <- do.call(rbind, replicate(n=I,
+                                      expr=X,
+                                      simplify=FALSE))
+        betaLeft <- t(X)%*%sigmaInv%*%X
+        betaRight <- t(X)%*%sigmaInv%*%y
         if(cicleRep){
-        ## Note: Here we use a(0) = a(T) restriction
+            ## Note: Here we use a(0) = a(T) restriction
+            if(basisFunction=='B-Splines')
+                basisObj = create.bspline.basis(range(t),
+                                                nbasis = n_basis,
+                                                norder = n_order)
+            if(basisFunction=='Fourier'){
+                basisObj = create.fourier.basis(range(t),
+                                                nbasis = n_basis)
+            }
+            B = predict(basisObj, t)
+            deltaVec <- matrix(B[1,] - B[nrow(B),],nrow=1)
+            ## Get lambdas
+            ## I can vectorize later (maybe)
+            m1List <- split(x=qr.solve(betaLeft),
+                            f=rep(1:C, each=n_basis))
+            m2List <- split(x=betaRight,
+                            f=rep(1:C, each=n_basis))
+            lambda <- matrix(numeric(C),nrow=1)
+            for(c in 1:C){
+                lUp <- deltaVec%*%
+                    matrix(m1List[[c]],
+                           nrow=n_basis)[,(n_basis*(c-1)+1):(c*n_basis)]%*%
+                    matrix(m2List[[c]],ncol=1)
+                lDown <- deltaVec%*%
+                    matrix(m1List[[c]],
+                           nrow=n_basis)[,(n_basis*(c-1)+1):(c*n_basis)]%*%
+                    t(deltaVec)
+                lambda[1,c] <- lUp/lDown
+            }
+            Rvec <- lambda %x% deltaVec
+            betaOut <- Matrix::solve(betaLeft, (betaRight - t(Rvec)))
         } else {
-            sigmaInv <- bdiag(sigmaInvList)
-            sigmaInv <- bdiag(replicate(n=I,
-                                        expr=sigmaInv,
-                                        simplify=FALSE))
-            X <- do.call(rbind, XList)
-            X <- do.call(rbind, replicate(n=I,
-                                          expr=X,
-                                          simplify=FALSE))
-            betaLeft <- t(X)%*%sigmaInv%*%X
-            betaRight <- t(X)%*%sigmaInv%*%y
             betaOut <- Matrix::solve(betaLeft, betaRight)
         } ## end if/else cicle
 
@@ -232,9 +265,15 @@ aggrmodel <- function(formula=NULL,
     } ## End while(lkDiff > diffTol)
 
     ## Output Mean curves
-    basisObj = create.bspline.basis(range(t),
-                                    nbasis = n_basis,
-                                    norder = n_order)
+    ## Note: Here we use a(0) = a(T) restriction
+    if(basisFunction=='B-Splines')
+        basisObj = create.bspline.basis(range(t),
+                                        nbasis = n_basis,
+                                        norder = n_order)
+    if(basisFunction=='Fourier'){
+        basisObj = create.fourier.basis(range(t),
+                                        nbasis = n_basis)
+    }
     B = predict(basisObj, t)
     ## Separate betas
     betaMC <- betaOut[1:(C*n_basis)]
