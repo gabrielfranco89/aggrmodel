@@ -109,7 +109,8 @@ loglikWrapper <- function(pars,
                           designListWrap,
                           nCons){
     muList <- lapply(designListWrap,
-                     function(x) x %*% betaWrap)
+                     function(x) as.matrix(x) %*% matrix(betaWrap,
+                                                         ncol=1))
     if(covWrap == 'Homog_Uniform'){
         sigmaList <- covMatrix(market = mktWrap,
                                group.name = 'Group',

@@ -79,17 +79,42 @@ aggrmodel <- function(formula=NULL,
                     n_basis = n_basis,
                     n_order = n_order,
                     basis = basisFunction)
-    bb <- lapply(XList,
+    if(!is.null(formula)){
+        cvrtMtx <- as.data.frame(model.matrix(formula, data = data))
+        cvrtMtx <- cbind(cvrtMtx,
+                         group=grps,
+                         rep=reps,
+                         time=t
+                         )
+        cvrtMtx <- cvrtMtx[order(cvrtMtx[['rep']],
+                                 cvrtMtx[['group']],
+                                 cvrtMtx[['time']]),]
+        ## same for all replicates
+        cvrtMtx <- subset(cvrtMtx,
+                          rep == unique(reps)[1])
+        cvrtMtx <- split(cvrtMtx, f=cvrtMtx$group)
+        for(j in names(XList)){
+            XList[[j]] <- cbind(as.data.frame(XList[[j]]),
+                                cvrtMtx[[j]]
+                                )
+            XList[[j]] <-as.matrix(
+                subset(XList[[j]], 
+                       select=-c(rep, group, time))
+                )
+            }
+        rm(cvrtMtx)
+    } ## end if is.null(formula)
+    X <- lapply(XList,
                  function(x)
                      do.call(rbind,replicate(n=I,
                                              expr=x,
                                              simplify=FALSE)
                              )
                  )
-    bb <- do.call(rbind, bb)
-    bb <- cbind(dd, bb)
-    bb <- bb[,-c(1:3)]
-    fit_init <- lm(y~.-1, data = bb)
+    X <- do.call(rbind, X)
+    X <- cbind(dd, X)
+    X <- X[,-c(1:3)]
+    fit_init <- lm(y~.-1, data = X)
     beta_init <- coef(fit_init)
     sigma_init <- sqrt(summary(fit_init)$sigma)
 
@@ -212,7 +237,8 @@ aggrmodel <- function(formula=NULL,
                                     norder = n_order)
     B = predict(basisObj, t)
     ## Separate betas
-    betaMtx <- cbind(beta=as.matrix(betaOut),
+    betaMC <- betaOut[1:(C*n_basis)]
+    betaMtx <- cbind(beta=as.matrix(betaMC),
                      type=rep(1:C, each=n_basis))
     mcMtx <- tapply(betaMtx[,1],
                     betaMtx[,2],
@@ -222,11 +248,14 @@ aggrmodel <- function(formula=NULL,
                         type=rep(unique(market[,2]), each=length(t)))
 
     ## Return
-    return(list('beta' = as.matrix(betaOut),
+    outList <- list('beta' = as.matrix(betaOut),
                 'pars' = parOut,
                 'mc' = mcMtx,
                 'n_basis' = n_basis,
-                'n_order' = n_order))
+                'n_order' = n_order)
+    if(!is.null(formula))
+        outList[['formula']] <- formula
+    return(outList)
 }
 
 
