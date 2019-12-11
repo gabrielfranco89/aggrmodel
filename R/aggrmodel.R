@@ -274,7 +274,8 @@ aggrmodel <- function(formula=NULL,
         basisObj = create.fourier.basis(range(t),
                                         nbasis = n_basis)
     }
-    B = predict(basisObj, t)
+    tuni <- unique(t)
+    B = predict(basisObj, tuni)
     ## Separate betas
     betaMC <- betaOut[1:(C*n_basis)]
     betaMtx <- cbind(beta=as.matrix(betaMC),
@@ -283,8 +284,8 @@ aggrmodel <- function(formula=NULL,
                     betaMtx[,2],
                     function(x) B %*% x)
     mcMtx <- data.frame(mc=unlist(mcMtx),
-                        time=rep(t,times=C),
-                        type=rep(unique(market[,2]), each=length(t)))
+                        time=rep(tuni,times=C),
+                        type=rep(unique(market[,2]), each=length(tuni)))
 
     ## Return
     outList <- list('beta' = as.matrix(betaOut),
