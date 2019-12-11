@@ -265,7 +265,6 @@ aggrmodel <- function(formula=NULL,
     } ## End while(lkDiff > diffTol)
 
     ## Output Mean curves
-    ## Note: Here we use a(0) = a(T) restriction
     if(basisFunction=='B-Splines')
         basisObj = create.bspline.basis(range(t),
                                         nbasis = n_basis,
@@ -286,13 +285,15 @@ aggrmodel <- function(formula=NULL,
     mcMtx <- data.frame(mc=unlist(mcMtx),
                         time=rep(tuni,times=C),
                         type=rep(unique(market[,2]), each=length(tuni)))
-
+    ## Output data with predicted values
+    dd$pred <- as.numeric(X %*% betaOut)
     ## Return
     outList <- list('beta' = as.matrix(betaOut),
                 'pars' = parOut,
                 'mc' = mcMtx,
                 'n_basis' = n_basis,
-                'n_order' = n_order)
+                'n_order' = n_order,
+                'fitted' = dd)
     if(!is.null(formula))
         outList[['formula']] <- formula
     return(outList)

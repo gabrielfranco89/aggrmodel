@@ -11,7 +11,7 @@ logLikelihood(data, muVecList, covMtxList)
 
 \item{muVecList}{List of \eqn{X\beta} for each group}
 
-\item{covMatrixList}{List of covariance matrices for each group}
+\item{covMtxList}{List of covariance matrices for each group}
 }
 \value{
 Log-likehood value

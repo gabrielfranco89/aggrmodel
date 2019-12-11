@@ -58,7 +58,7 @@ buildX <- function(market,
 #'
 #' @param data Data Frame with 4 columns in the following order: Group, Replicates, Time, Signal
 #' @param muVecList List of \eqn{X\beta} for each group
-#' @param covMatrixList List of covariance matrices for each group
+#' @param covMtxList List of covariance matrices for each group
 #'
 #' @return Log-likehood value
 
@@ -99,7 +99,17 @@ logLikelihood <- function(data,
 }
 
 
-
+#' Wrapper for log-likelihood evaluation
+#' @name loglikWrapper
+#'
+#' @param pars parameters to be evaluated in optim
+#' @param dataWrap dataset
+#' @param mktWrap market dataset
+#' @param covWrap covariance structure
+#' @param corWrap correlation structure
+#' @param betaWrap beta parameter
+#' @param designListWrap list of design matrices for each group
+#' @param nCons number of types of consumers
 loglikWrapper <- function(pars,
                           dataWrap,
                           mktWrap,
