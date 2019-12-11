@@ -4,10 +4,12 @@
 \alias{plotMC}
 \title{Plot fit's mean curve}
 \usage{
-plotMC(object)
+plotMC(object, scales = "fixed")
 }
 \arguments{
 \item{object}{aggrmodel object fit}
+
+\item{scales}{Character value indicating if scales should be 'fixed' or 'free' in the ggplot}
 }
 \value{
 ggplot plot object
