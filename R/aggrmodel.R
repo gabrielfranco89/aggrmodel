@@ -10,6 +10,7 @@
 #' @param repVar Name of replicates variable
 #' @param basisFunction Character indicating which basis: 'B-Splines' or 'Fourier'
 #' @param n_basis Number of basis functions for basis expansion
+#' @param n_basis_cov Number of basis functions for variance functional expansion
 #' @param n_order Order of basis Splines (Default: 4)
 #' @param cicleRep Indicator TRUE/FALSE if replicates are cyclical
 #' @param covType Covariance functional type. One of "Homog_Uniform", "Homog" or "Heterog"
@@ -32,6 +33,7 @@ aggrmodel <- function(formula=NULL,
                       groupVar,
                       repVar,
                       n_basis,
+                      n_basis_cov = NULL,
                       basisFunction = 'B-Splines',
                       cicleRep = FALSE,
                       n_order = 4,
@@ -135,30 +137,41 @@ aggrmodel <- function(formula=NULL,
         parIn <- c(sigPar, corPar)
         lowBoundVec <- c(rep(-Inf,C), rep(0,C))
     }
-
     if(covType == 'Heterog'){
-        ## Get mean curves
-        require(fda,quietly=TRUE)
-        basisObj = create.bspline.basis(range(t),
-                                        nbasis = n_basis,
-                                        norder = n_order)
-        B = predict(basisObj, t)
-        mc <- tapply(beta_init,
-                     rep(1:C,
-                         each=n_basis),
-                     function(b) B %*% b)
-
-        ## <-- Under construction
-
-
-        sigPar <- rep(sigma_init,C)
-        corPar <- rep(-180, C)
+        ## <----------------------- UNDER CONSTRUCTION
+        if(is.null(n_basis_cov)){
+            warning(paste("Using the same number of basis of model fit:",n_basis))
+            n_basis_cov <- n_basis
+            sigPar <- beta_init
+        } else {
+            ## fit new object for heterog.
+            XListCov <- buildX(market=market,
+                            timeVec = t,
+                            n_basis = n_basis_cov,
+                            n_order = n_order,
+                            basis = basisFunction)
+            Xcov <- lapply(XListCov,
+                        function(x)
+                            do.call(rbind,replicate(n=I,
+                                                    expr=x,
+                                                    simplify=FALSE)
+                                    )
+                        )
+            Xcov <- do.call(rbind, Xcov)
+            Xcov <- cbind(dd, Xcov)
+            Xcov <- Xcov[,-c(1:3)]
+            fit_init_cov <- lm(y~.-1, data = Xcov)
+            beta_init_cov <- coef(fit_init)
+            sigPar <- beta_init_cov
+        } # end if/else
+        sigPar <- beta_init
+        corPar <- rep(180, C)
         tauPar <- rep(.5, C)
-        funcVecIn <- fit
-
-        ## -->
-
-    }
+        parIn <- c(sigPar, corPar, tauPar)
+        lowBoundVec <- c(rep(-Inf,C*n_basis_cov),
+                         rep(0,2*C)) ## tau's > 0?
+        ## UNDER CONSTRUCTION ---------------------->
+    }# end if heterog
 
     ## While preamble
     betaIn = beta_init
@@ -179,7 +192,8 @@ aggrmodel <- function(formula=NULL,
                      designListWrap = XList,
                      nCons = C,
                      lower = lowBoundVec,
-                     method = "L-BFGS-B")
+                     method = "L-BFGS-B",
+                     nBasisCov = n_basis_cov)
         parOut <- opt$par
         lkOut <- opt$value
         ## message('\nLikehood =', lkOut)

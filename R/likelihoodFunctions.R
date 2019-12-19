@@ -110,6 +110,7 @@ logLikelihood <- function(data,
 #' @param betaWrap beta parameter
 #' @param designListWrap list of design matrices for each group
 #' @param nCons number of types of consumers
+#' @param nBasisCov number of basis functions for functional variance
 loglikWrapper <- function(pars,
                           dataWrap,
                           mktWrap,
@@ -135,14 +136,41 @@ loglikWrapper <- function(pars,
     if(covWrap == 'Homog'){
         C <- length(unique(mktWrap[,2]))
         sigmaList <- covMatrix(market = mktWrap,
-                                  group.name = 'Group',
-                                  type.name = 'type',
-                                  mkt.name = 'mkt',
-                                  timeVec = dataWrap$time,
-                                  sigPar = pars[1:C],
-                                  corPar = pars[(C+1):(2*C)],
-                                  covType = 'Homog',
-                                  corType = corWrap )
+                               group.name = 'Group',
+                               type.name = 'type',
+                               mkt.name = 'mkt',
+                               timeVec = dataWrap$time,
+                               sigPar = pars[1:C],
+                               corPar = pars[(C+1):(2*C)],
+                               covType = 'Homog',
+                               corType = corWrap )
+    }
+    if(covWrap == 'Heterog'){
+        ## <-------------------- UNDER CONSTRUCTION
+        C <- length(unique(mktWrap[,2]))
+        tvec <- unique(dataWrap$time)
+        basisObj = create.bspline.basis(range(tvec),
+                                        nbasis = n_basis,
+                                        norder = n_order)
+        B <- predict(basisObj, tvec)
+        betaMC <- pars[1:(C*nBasisCov)]
+        betaMtx <- cbind(beta=as.matrix(betaMC),
+                         type=rep(1:C, each=n_basis))
+        mcMtx <- tapply(betaMtx[,1],
+                        betaMtx[,2],
+                        function(x) B %*% x)
+        funcVarIn <- matrix(unlist(mcMtx), ncol = C)
+        sigmaList <- covMatrix(market = mktWrap,
+                               group.name = 'Group',
+                               type.name = 'type',
+                               mkt.name = 'mkt',
+                               timeVec = dataWrap$time,
+                               funcMtx = funcVarIn,
+                               corPar = pars[(C*nBasisCov+1):(length(pars)-C)]
+                               tauPar = pars[((length(pars)-C+1):length(pars))],
+                               covType = 'Heterog',
+                               corType = corWrap )
+        ## UNDER CONSTRUCTION -------------------->
     }
     lk <- logLikelihood(data = dataWrap,
                         muVecList = muList,

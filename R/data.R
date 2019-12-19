@@ -29,3 +29,18 @@
 #' }
 #' @source Simulated data
 "market"
+
+
+#' Simulated Mean Curves for simulation
+#'
+#' A dataset containing two different sets of three mean curves for simulation. Can be used for cluster analysis or standard aggregated fit
+#'
+#' @format A data frame with 144 obs. of 4 variables:
+#' \describe{
+#' \item{Time}{Observed times in 30 minutes interval}
+#' \item{Type}{Type flag: A, B or C}
+#' \item{Cluster1}{Simple mean curve with featured peaks}
+#' \item{Cluster2}{Mean curves used in previous trafo's research.}
+#' }
+#' @source Simulated data in Cluster 1 and estimated mean curves in Cluster 2 obtained as in  Lenzi et al. (2017) and Dias et al. (2019,2013).
+"simulatedMeanCurves"

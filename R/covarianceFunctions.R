@@ -165,7 +165,7 @@ createVarMtx <- function(functionalVec,
 #' myFuncMtx = matrix(runif(8), nrow = 4, ncol=2)
 #'
 #' ## Homogeneous example
-#' homogMtx = covMatrix(market = mkt, group.name = 'group', type.name = 'type', mkt.name = 'value', timeVec = myTimevec, sigPar = mySigPar, tauPar = myTauPar, corPar = myTauPar, covType = 'Homog', corType = 'periodic')
+#' homogMtx = covMatrix(market = mkt, group.name = 'group', type.name = 'type', mkt.name = 'value', timeVec = myTimevec, sigPar = mySigPar, tauPar = myTauPar, corPar = myCorPar, covType = 'Homog', corType = 'periodic')
 #'
 covMatrix <- function(market,
                       group.name,
@@ -271,47 +271,39 @@ covMatrix <- function(market,
     if(covType == 'Heterog'){
 
         ## NOTE ----------------------------------------
-        ##   The object funcVec must be a matrix TxC of fitted tipologies.
+        ##   The object funcVec must be a matrix TxC of
+        ##        fitted tipologies.
         ##   Can be any functional of representation Tx1. This allows
         ##     heterogeneous variance structures as in
         ##     Dias, Garcia, Schmidt (2011)
-
-
         if(any(ncol(funcMtx) != C,
                nrow(funcMtx) != T,
                length(corPar) != C))
             stop('Please, check number of parameters for proportional model!')
-
-
-        covMtxListC <- lapply(1:C,
-                              function(c, sigParIn, corParIn,
-                                       tauParIn, funcVecIn,
-                                       trc, t){
-
-                                  vc <- createVarMtx(functionalVec = funcVecIn[,c],
-                                                     sigPar = sigParIn[c],
-                                                     tauPar = tauParIn[c])
-
-                                  if(corType == 'periodic')
-                                      cc <- periodicCorMtx(timeVec = t,
-                                                           corPar = corParIn[c],
-                                                           truncateDec = trc)
-
-                                  if(corType == 'exponential')
-                                      cc <- expCorMtx(timeVec = t,
-                                                      corPar = corParIn[c],
-                                                      truncateDec = trc)
-
-                                  return( vc %*% cc %*% vc)
-
-                              },
-                              corParIn = corPar,
-                              sigParIn = sigPar,
-                              tauParIn = tauPar,
-                              funcVecIn = funcMtx,
-                              trc = truncateDec,
-                              t=t)
-
+        covMtxListC <-
+            lapply(1:C,
+                   function(c, sigParIn, corParIn,
+                            tauParIn, funcVecIn,
+                            trc, t){
+                       vc <- createVarMtx(functionalVec = funcVecIn[,c],
+                                          sigPar = sigParIn[c],
+                                          tauPar = tauParIn[c])
+                       if(corType == 'periodic')
+                           cc <- periodicCorMtx(timeVec = t,
+                                                corPar = corParIn[c],
+                                                truncateDec = trc)
+                       if(corType == 'exponential')
+                           cc <- expCorMtx(timeVec = t,
+                                           corPar = corParIn[c],
+                                           truncateDec = trc)
+                       return( vc %*% cc %*% vc)
+                   },
+                   corParIn = corPar,
+                   sigParIn = sigPar,
+                   tauParIn = tauPar,
+                   funcVecIn = funcMtx,
+                   trc = truncateDec,
+                   t=t) # end lapply
         covMtxList = lapply(mktComp,
                      function(mj, cMtx, C){
                          mm = lapply(1:C,
@@ -321,7 +313,6 @@ covMatrix <- function(market,
                      cMtx = covMtxListC,
                      C=C
                      )
-
     } # end if hetero
 
     return(covMtxList)
