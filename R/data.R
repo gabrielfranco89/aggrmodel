@@ -31,7 +31,7 @@
 "market"
 
 
-#' Simulated Mean Curves for simulation
+#' Simulated Mean Curves for simulation analysis
 #'
 #' A dataset containing two different sets of three mean curves for simulation. Can be used for cluster analysis or standard aggregated fit
 #'
@@ -44,3 +44,15 @@
 #' }
 #' @source Simulated data in Cluster 1 and estimated mean curves in Cluster 2 obtained as in  Lenzi et al. (2017) and Dias et al. (2019,2013).
 "simulatedMeanCurves"
+
+#' Simulated Temperature for simulation analysis
+#'
+#' A dataset containing temperature for 20 days observed in 30 minutes intervals
+#'
+#' @format A data frame with 960 obs. of 3 variables:
+#' \describe{
+#' \item{Time}{Observed times in 30 minutes interval}
+#' \item{Day}{Day flag: from 1 to 20}
+#' \item{Temp}{Temperature: day 1 to 10 is a Brazilian summer scenario and day 11 to 20 a Brazilian winter scenario}
+#' }
+"simuTemperature"

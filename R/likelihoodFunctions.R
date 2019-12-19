@@ -166,7 +166,7 @@ loglikWrapper <- function(pars,
                                mkt.name = 'mkt',
                                timeVec = dataWrap$time,
                                funcMtx = funcVarIn,
-                               corPar = pars[(C*nBasisCov+1):(length(pars)-C)]
+                               corPar = pars[(C*nBasisCov+1):(length(pars)-C)],
                                tauPar = pars[((length(pars)-C+1):length(pars))],
                                covType = 'Heterog',
                                corType = corWrap )

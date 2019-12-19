@@ -13,6 +13,7 @@ aggrmodel(
   groupVar,
   repVar,
   n_basis,
+  n_basis_cov = NULL,
   basisFunction = "B-Splines",
   cicleRep = FALSE,
   n_order = 4,
@@ -37,6 +38,8 @@ aggrmodel(
 \item{repVar}{Name of replicates variable}
 
 \item{n_basis}{Number of basis functions for basis expansion}
+
+\item{n_basis_cov}{Number of basis functions for variance functional expansion}
 
 \item{basisFunction}{Character indicating which basis: 'B-Splines' or 'Fourier'}
 
