@@ -185,6 +185,7 @@ covMatrix <- function(market,
     require(dplyr,quietly=TRUE)
     require(purrr,quietly=TRUE)
     require(tidyr,quietly=TRUE)
+    select <- dplyr::select
 
     ## Preamble
     myMkt <- market
