@@ -118,7 +118,9 @@ loglikWrapper <- function(pars,
                           corWrap,
                           betaWrap,
                           designListWrap,
-                          nCons){
+                          nCons,
+                          nBasisCov ## for heterog model
+                          ){ 
     muList <- lapply(designListWrap,
                      function(x) as.matrix(x) %*% matrix(betaWrap,
                                                          ncol=1))
