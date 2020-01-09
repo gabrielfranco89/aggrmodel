@@ -17,6 +17,10 @@
 #'
 #' designList = buildX(myMkt, myTimeVec, n_basis = 5)
 #' str(designList)
+#' @import fda
+#' @import tidyr
+#' @import mvtnorm
+#' @export
 
 buildX <- function(market,
                    timeVec,
@@ -61,6 +65,8 @@ buildX <- function(market,
 #' @param covMtxList List of covariance matrices for each group
 #'
 #' @return Log-likehood value
+#' @import mvtnorm
+#' @export
 
 logLikelihood <- function(data,
                           muVecList,
@@ -111,6 +117,7 @@ logLikelihood <- function(data,
 #' @param designListWrap list of design matrices for each group
 #' @param nCons number of types of consumers
 #' @param nBasisCov number of basis functions for functional variance
+#' @export
 loglikWrapper <- function(pars,
                           dataWrap,
                           mktWrap,

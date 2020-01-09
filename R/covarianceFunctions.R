@@ -7,6 +7,7 @@
 #' @return Square correlation matrix of size \code{length(unique(timeVec))}
 #' @examples
 #' createCorBase(seq(0,1, length.out=12))
+#' @export
 createCorBase <- function(timeVec){
 
     time <- unique(timeVec)
@@ -44,6 +45,7 @@ createCorBase <- function(timeVec){
 #' @examples
 #' myTime <- seq(0,1, length.out = 12)
 #' periodicCorMtx(myTime, corPar = 8, truncateDec = 4)
+#' @export
 periodicCorMtx <- function(timeVec,
                            corPar,
                            truncateDec = NULL){
@@ -80,6 +82,7 @@ periodicCorMtx <- function(timeVec,
 #' @examples
 #' myTime <- seq(0,1, length.out = 12)
 #' expCorMtx(myTime, corPar = 8, truncateDec = 4)
+#' @export
 expCorMtx <- function(timeVec, corPar,
                       truncateDec = NULL){
     ## require(Matrix)
@@ -112,6 +115,7 @@ expCorMtx <- function(timeVec, corPar,
 #' \deqn{v(t) = \sigma \, (\eta(t))^{-\tau}}
 #'
 #' @return A square functional variace matrix with size = \code{length(functionalVec)}
+#' @export
 createVarMtx <- function(functionalVec,
                             sigPar,
                             tauPar){
@@ -166,7 +170,12 @@ createVarMtx <- function(functionalVec,
 #'
 #' ## Homogeneous example
 #' homogMtx = covMatrix(market = mkt, group.name = 'group', type.name = 'type', mkt.name = 'value', timeVec = myTimevec, sigPar = mySigPar, tauPar = myTauPar, corPar = myCorPar, covType = 'Homog', corType = 'periodic')
+#' @export
 #'
+#' @import Matrix
+#' @import dplyr
+#' @import purrr
+#' @import tidyr
 covMatrix <- function(market,
                       group.name,
                       type.name,
@@ -315,10 +324,7 @@ covMatrix <- function(market,
                      C=C
                      )
     } # end if hetero
-
     return(covMtxList)
-
-
 }
 
 

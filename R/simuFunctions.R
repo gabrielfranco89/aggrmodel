@@ -13,8 +13,9 @@
 #' Return a data frame with 20 replicates and 3 types of consumer observed in 48 times.
 #'
 #' @examples
-#' dd = simuData()
-#' dd = simuData(nGroups=4)
+#' dd = createSimuData()
+#' dd = createSimuData(nGroups=4)
+#' @export
 createSimuData <- function(nGroups=10,
                            market=NULL,
                            market_range = 1:100,

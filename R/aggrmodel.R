@@ -24,6 +24,8 @@
 #' mkt = subset(mkt, select=-Cluster)
 #'
 #' aggrFit = aggrmodel(data = df, market = mkt, Y = Load, timeVar = Time, groupVar = Group, repVar = Rep, n_basis = 7)
+#' @import Matrix
+#' @export
 
 aggrmodel <- function(formula=NULL,
                       data,

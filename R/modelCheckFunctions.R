@@ -5,6 +5,7 @@
 #' @param scales Character value indicating if scales should be 'fixed' or 'free' in the ggplot
 #'
 #' @return ggplot plot object
+#' @import ggplot2
 plotMC <- function(object, scales = 'fixed'){
     require(ggplot2)
     mcMtx <- object$mc
@@ -20,6 +21,7 @@ plotMC <- function(object, scales = 'fixed'){
 #' @param object aggrmodel object fit
 #' @param obsAlpha Numeric between 0 and 1 indicating observed curves transparency
 #' @param predColor Character or numeric indicating fitted curves color
+#' @import ggplot2
 plotFitted <- function(object,
                        obsAlpha = .5,
                        predColor = 'magenta'){

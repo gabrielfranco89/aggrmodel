@@ -72,5 +72,4 @@ myFuncMtx = matrix(runif(8), nrow = 4, ncol=2)
 
 ## Homogeneous example
 homogMtx = covMatrix(market = mkt, group.name = 'group', type.name = 'type', mkt.name = 'value', timeVec = myTimevec, sigPar = mySigPar, tauPar = myTauPar, corPar = myCorPar, covType = 'Homog', corType = 'periodic')
-
 }

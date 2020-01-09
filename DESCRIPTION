@@ -1,12 +1,23 @@
 Package: aggrmodel
 Type: Package
-Title: What the Package Does (Title Case)
+Title: A R package to fit aggregated data model
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License:  GNU GENERAL PUBLIC LICENSE, Version 3, 29 June 2007
+Author: Gabriel Franco
+Maintainer: Gabriel Franco <gabriel@ime.unicamp.br>
+Description: Fit aggregated data model using covariates, with
+    an additional functional component. Model-based cluster for
+    data groups. Simulation and graphing tools for model check.
+Depends: R (>= 3.1.0)
+License:  GPL-3
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.0.1
+Imports:
+     Matrix,
+     dplyr,
+     fda,
+     ggplot2,
+     MASS,
+     mvtnorm,
+     purrr,
+     tidyr
