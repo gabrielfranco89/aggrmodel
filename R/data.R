@@ -13,7 +13,7 @@
 #'   \item{Time}{Time variable with 48 samples times}
 #'   \item{Load}{Simulated dependent aggregated variable}
 #' }
-#' @source Simulated data
+#' @source Simulated data by createSimuData function
 "simuData"
 
 #' Market for simulated data

@@ -1,5 +1,5 @@
 #' Simulate aggregated data
-#' @name simuData
+#' @name createSimuData
 #' @param nGroups Number of groups to be simulated
 #' @param market Optional. Insert the market as a data frame with the columns 'group', 'type' and 'num'
 #' @param market_range If market not inserted, the range to be sampled
@@ -15,15 +15,15 @@
 #' @examples
 #' dd = simuData()
 #' dd = simuData(nGroups=4)
-simuData <- function(nGroups=10,
-                     market=NULL,
-                     market_range = 1:100,
-                     sigPar = c(2,2,2),
-                     tauPar = c(.5,.5,.5),
-                     corPar = c(13,13,13),
-                     seed=NULL,
-                     tempPar=1
-                     ){
+createSimuData <- function(nGroups=10,
+                           market=NULL,
+                           market_range = 1:100,
+                           sigPar = c(2,2,2),
+                           tauPar = c(.5,.5,.5),
+                           corPar = c(13,13,13),
+                           seed=NULL,
+                           tempPar=1
+                           ){
     ## Preamble
     if(nGroups %% 2 != 0)
         stop("Please use an even number of groups to make it possible to divide into two clusters. \nIf you do not want to use clusters, simply double the number of groups and use just the half of generated data :)")

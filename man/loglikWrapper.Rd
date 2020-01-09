@@ -12,7 +12,8 @@ loglikWrapper(
   corWrap,
   betaWrap,
   designListWrap,
-  nCons
+  nCons,
+  nBasisCov
 )
 }
 \arguments{
