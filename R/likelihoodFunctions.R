@@ -46,13 +46,13 @@ buildX <- function(market,
                                         nbasis = n_basis)
     }
     B = predict(basisObj, t)
-    
-    ## Kronecker product with market    
+
+    ## Kronecker product with market
     X <- tapply(market[,3],
                 market[,1],
                 FUN=function(m) t(m) %x% B,
                 simplify=FALSE)
-    return(X)        
+    return(X)
 }
 
 #' Compute log-likelihood for aggregated model
@@ -79,12 +79,12 @@ logLikelihood <- function(data,
 
     ## Sort data to match time, group and replicates
     ##    data <- data[order(data[,1], data[,2], data[,3]),]
-    
+
     sumLogLik <- 0
     for(j in grps){
 
         subData <- subset(data, data[,1]==j)
-        
+
         actualMu <- muVecList[[j]]
         actualSigma <- as.matrix(covMtxList[[j]])
 
@@ -96,11 +96,11 @@ logLikelihood <- function(data,
                          log=TRUE)
 
         sumLogLik <- sumLogLik + sum(logLik)
-        
+
     }
 
     return(-sumLogLik)
-    
+
 
 }
 
@@ -127,7 +127,7 @@ loglikWrapper <- function(pars,
                           designListWrap,
                           nCons,
                           nBasisCov ## for heterog model
-                          ){ 
+                          ){
     muList <- lapply(designListWrap,
                      function(x) as.matrix(x) %*% matrix(betaWrap,
                                                          ncol=1))
@@ -186,3 +186,133 @@ loglikWrapper <- function(pars,
                         covMtxList = sigmaList)
     return(lk)
 }
+
+
+## ================================================
+##   ╔═╗╔╦╗  ╔═╗┬ ┬┌┐┌┌─┐┌┬┐┬┌─┐┌┐┌┌─┐
+##   ║╣ ║║║  ╠╣ │ │││││   │ ││ ││││└─┐
+##   ╚═╝╩ ╩  ╚  └─┘┘└┘└─┘ ┴ ┴└─┘┘└┘└─┘
+## ================================================
+
+#' Title
+#'
+#' @param data
+#' @param sigmaList
+#' @param xbetaList
+#' @param probTab
+#' @param B
+#'
+#' @return
+#' @export
+#' @importFrom mvtnorm dmvnorm
+#'
+#' @examples
+Q_function <- function(data,sigmaList,xbetaList,probTab,B){
+    logLikOut=0
+    for(j in unique(data$group)){
+        for(i in unique(data$rep)){
+            yij <- subset(data, group==j&rep==i)$y
+            for(b in 1:B){
+                xbeta_jb <- xbetaList[[j]][,b]
+                probSigma_jb <- subset(probTab, grps==j&reps==i)[,b+2]
+                probSigma_jb <- as.numeric(probSigma_jb)*sigmaList[[b]][[j]]
+                logLikOut <- logLikOut + mvtnorm::dmvnorm(x=yij,
+                                                          mean = xbeta_jb,
+                                                          sigma= probSigma_jb,
+                                                          log = TRUE)
+            } # end for b
+        } # end for i
+    } # end for j
+    -logLikOut ## minor for maximization
+}
+
+
+#' Title
+#'
+#' @param covPar
+#' @param data
+#' @param market
+#' @param betaPar
+#' @param piPar
+#' @param B
+#' @param t
+#' @param K
+#' @param basisFunction
+#' @param n_order
+#'
+#' @return
+#' @export
+#'
+#' @examples
+Q_wrapper <- function(covPar,data,market,betaPar,piPar,B,t,K,I,J,
+                      basisFunction,n_order){
+    covPar <- matrix(covPar, nrow=B)
+    ## Get probTabs
+    sigMtxList <- lapply(1:B, function(b){
+        sig <- covMatrix(market = market,group.name = 'group',
+                         type.name = 'type',mkt.name = 'num',
+                         timeVec = t,sigPar = covPar[b,1],
+                         tauPar = NULL,corPar = covPar[b,2],
+                         funcMtx = NULL,covType = 'Homog_Uniform',
+                         corType = 'periodic',nKnots = NULL,
+                         truncateDec = 8)
+        sig
+    })
+    XList <- buildX(market = market,timeVec = t,n_basis = K,
+                    basis = basisFunction,n_order = n_order)
+    # X <- lapply(XList,
+    #             function(x)
+    #               do.call(rbind,replicate(n=I,
+    #                                       expr=x,
+    #                                       simplify=FALSE)
+    #               )
+    # )
+    X <- XList
+    xbeta <- lapply(X, function(x) apply(betaPar, 2, function(bt) x %*% bt))
+    # yj <- split(y,grps)
+    probTab_init <- matrix(nrow=I*J, ncol=(B))
+    probTab_names <- data.frame(reps = vector(mode=class(data$rep),length = I*J),
+                                grps = vector(mode=class(data$group),length = I*J))
+    k=1
+    for(i in unique(data$rep)){
+        for(j in unique(data$group)){
+            for(b in 1:B){
+                probTab_names$reps[k] = i
+                probTab_names$grps[k] = j
+                yij <- subset(data, rep==i & group==j)$y
+                probTab_init[k,b] <- mvtnorm::dmvnorm(x = as.numeric(yij),
+                                                      mean = as.numeric(c(xbeta[[j]][,b])),
+                                                      sigma = as.matrix(sigMtxList[[b]][[j]]),
+                                                      log=TRUE)
+
+            }
+            k=k+1
+        }
+    }
+    for(k in 1:(I*J)){
+        for(b in 1:B){
+            probTab_init[k,b] <- probTab_init[k,b] + log(piPar[1,b])
+        }
+    }
+    denomProb <- log(rowSums(exp(probTab_init)))
+    for(k in 1:(I*J)){
+        for(b in 1:B){
+            probTab_init[k,b] <- probTab_init[k,b] - denomProb[k]
+        }
+        if(all(exp(probTab_init[k,])==0)){ ## if all probs are zero
+            b1 <- which.min(probTab_init[k,])
+            probTab_init[k,] <- rep(0,times=B)
+            probTab_init[k,b1] <- 1
+        }else{
+            probTab_init[k,] <- exp(probTab_init[k,])
+        }
+    }
+    pTab_init <- cbind(probTab_names, probTab_init)
+    ## SEND TO Q_Function
+    Q_function(data=data,
+               sigmaList = sigMtxList,
+               xbetaList = xbeta,
+               probTab = pTab_init,
+               B=B)
+
+    }
