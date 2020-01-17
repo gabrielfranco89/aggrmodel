@@ -53,7 +53,7 @@ periodicCorMtx <- function(timeVec,
 
     baseMtx <- createCorBase(timeVec)
 
-    mtx <- apply(baseMtx, 2, function(x) exp(-2* (sin(pi*x)^2)*corPar^2 ))
+    mtx <- apply(baseMtx, 2, function(x) exp(-2* (sin(pi*x)^2)*abs(corPar^2 )))
 
     if(!is.null(truncateDec)) mtx <- round(mtx,truncateDec)
 
@@ -89,7 +89,7 @@ expCorMtx <- function(timeVec, corPar,
 
     baseMtx <- createCorBase(timeVec)
 
-    mtx <- apply(baseMtx, 2, function(x) exp(-abs(x)*corPar))
+    mtx <- apply(baseMtx, 2, function(x) exp(-abs(x)*abs(corPar)))
 
     if(!is.null(truncateDec)) mtx <- round(mtx,truncateDec)
 

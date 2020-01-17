@@ -214,16 +214,19 @@ Q_function <- function(data,sigmaList,xbetaList,probTab,B){
             yij <- subset(data, group==j&rep==i)$y
             for(b in 1:B){
                 xbeta_jb <- xbetaList[[j]][,b]
-                probSigma_jb <- subset(probTab, grps==j&reps==i)[,b+2]
-                probSigma_jb <- as.numeric(probSigma_jb)*sigmaList[[b]][[j]]
-                logLikOut <- logLikOut + mvtnorm::dmvnorm(x=yij,
-                                                          mean = xbeta_jb,
-                                                          sigma= probSigma_jb,
-                                                          log = TRUE)
+                prob_ijb <- subset(probTab, grps==j&reps==i)[,b+2]
+                prob_ijb <- as.numeric(prob_ijb)
+                sigma_jb <- as.matrix(sigmaList[[b]][[j]])
+                logLikOut <- logLikOut +
+                    prob_ijb* mvtnorm::dmvnorm(x=yij,
+                                                    mean = xbeta_jb,
+                                                    sigma= sigma_jb,
+                                                    log = TRUE)
             } # end for b
         } # end for i
     } # end for j
-    -logLikOut ## minor for maximization
+    # message(paste('',round(-logLikOut,6)))
+    -logLikOut ## minus for maximization
 }
 
 
@@ -239,12 +242,15 @@ Q_function <- function(data,sigmaList,xbetaList,probTab,B){
 #' @param K
 #' @param basisFunction
 #' @param n_order
+#' @param pTab
+#' @param I
+#' @param J
 #'
 #' @return
 #' @export
 #'
 #' @examples
-Q_wrapper <- function(covPar,data,market,betaPar,piPar,B,t,K,I,J,
+Q_wrapper <- function(covPar,data,market,betaPar,piPar,pTab,B,t,K,I,J,
                       basisFunction,n_order){
     covPar <- matrix(covPar, nrow=B)
     ## Get probTabs
@@ -270,49 +276,49 @@ Q_wrapper <- function(covPar,data,market,betaPar,piPar,B,t,K,I,J,
     X <- XList
     xbeta <- lapply(X, function(x) apply(betaPar, 2, function(bt) x %*% bt))
     # yj <- split(y,grps)
-    probTab_init <- matrix(nrow=I*J, ncol=(B))
-    probTab_names <- data.frame(reps = vector(mode=class(data$rep),length = I*J),
-                                grps = vector(mode=class(data$group),length = I*J))
-    k=1
-    for(i in unique(data$rep)){
-        for(j in unique(data$group)){
-            for(b in 1:B){
-                probTab_names$reps[k] = i
-                probTab_names$grps[k] = j
-                yij <- subset(data, rep==i & group==j)$y
-                probTab_init[k,b] <- mvtnorm::dmvnorm(x = as.numeric(yij),
-                                                      mean = as.numeric(c(xbeta[[j]][,b])),
-                                                      sigma = as.matrix(sigMtxList[[b]][[j]]),
-                                                      log=TRUE)
-
-            }
-            k=k+1
-        }
-    }
-    for(k in 1:(I*J)){
-        for(b in 1:B){
-            probTab_init[k,b] <- probTab_init[k,b] + log(piPar[1,b])
-        }
-    }
-    denomProb <- log(rowSums(exp(probTab_init)))
-    for(k in 1:(I*J)){
-        for(b in 1:B){
-            probTab_init[k,b] <- probTab_init[k,b] - denomProb[k]
-        }
-        if(all(exp(probTab_init[k,])==0)){ ## if all probs are zero
-            b1 <- which.min(probTab_init[k,])
-            probTab_init[k,] <- rep(0,times=B)
-            probTab_init[k,b1] <- 1
-        }else{
-            probTab_init[k,] <- exp(probTab_init[k,])
-        }
-    }
-    pTab_init <- cbind(probTab_names, probTab_init)
+    # probTab_init <- matrix(nrow=I*J, ncol=(B))
+    # probTab_names <- data.frame(reps = vector(mode=class(data$rep),length = I*J),
+    #                             grps = vector(mode=class(data$group),length = I*J))
+    # k=1
+    # for(i in unique(data$rep)){
+    #     for(j in unique(data$group)){
+    #         for(b in 1:B){
+    #             probTab_names$reps[k] = i
+    #             probTab_names$grps[k] = j
+    #             yij <- subset(data, rep==i & group==j)$y
+    #             probTab_init[k,b] <- mvtnorm::dmvnorm(x = as.numeric(yij),
+    #                                                   mean = as.numeric(c(xbeta[[j]][,b])),
+    #                                                   sigma = as.matrix(sigMtxList[[b]][[j]]),
+    #                                                   log=TRUE)
+    #
+    #         }
+    #         k=k+1
+    #     }
+    # }
+    # for(k in 1:(I*J)){
+    #     for(b in 1:B){
+    #         probTab_init[k,b] <- probTab_init[k,b] + log(piPar[1,b])
+    #     }
+    # }
+    # denomProb <- log(rowSums(exp(probTab_init)))
+    # for(k in 1:(I*J)){
+    #     for(b in 1:B){
+    #         probTab_init[k,b] <- probTab_init[k,b] - denomProb[k]
+    #     }
+    #     if(all(exp(probTab_init[k,])==0)){ ## if all probs are zero
+    #         b1 <- which.min(probTab_init[k,])
+    #         probTab_init[k,] <- rep(0,times=B)
+    #         probTab_init[k,b1] <- 1
+    #     }else{
+    #         probTab_init[k,] <- exp(probTab_init[k,])
+    #     }
+    # }
+    # pTab_init <- cbind(probTab_names, probTab_init)
     ## SEND TO Q_Function
     Q_function(data=data,
                sigmaList = sigMtxList,
                xbetaList = xbeta,
-               probTab = pTab_init,
+               probTab = pTab,
                B=B)
 
     }

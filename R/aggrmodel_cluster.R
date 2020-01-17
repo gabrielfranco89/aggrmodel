@@ -136,6 +136,7 @@ getClusterInitials <- function(data,
 #' @param diffTol
 #' @param n_cluster
 #' @param n_trials
+#' @param itMax
 #'
 #' @name aggrmodel_cluster
 #'
@@ -158,7 +159,8 @@ aggrmodel_cluster <- function(formula=NULL,
                               covType = 'Homog_Uniform',
                               corType = 'periodic',
                               diffTol = 1e-6,
-                              itMax = 100){
+                              itMax = 100,
+                              verbose=FALSE){
   ## Checklist
   covFlag = covType %in% c("Homog_Uniform", "Homog", "Heterog")
   if(!covFlag)
@@ -201,90 +203,159 @@ aggrmodel_cluster <- function(formula=NULL,
   beta_init <- matrix(beta_init, ncol=B)
   sigma_init <- unlist(lapply(cl_init[[2]],function(x) summary(x)$sigma))
   sigma_init <- matrix(sqrt(sigma_init), ncol=B)
-  theta_init <- matrix(90, ncol=B)
+  theta_init <- matrix(10, ncol=B)
   pi_init <- prop.table(table(cluster_init[,2]))
   pi_init <- matrix(pi_init, ncol=B)
-  ## Get probabilities for first E-Step
-  sigMtxList <- lapply(1:B, function(b){
-    sig <- covMatrix(market = market,group.name = 'group',
-                     type.name = 'type',mkt.name = 'num',
-                     timeVec = t,sigPar = sigma_init[1,b],
-                     tauPar = NULL,corPar = theta_init[1,b],
-                     funcMtx = NULL,covType = 'Homog_Uniform',
-                     corType = 'periodic',nKnots = NULL,
-                     truncateDec = 8)
-    sig
-  })
+  ## While loop ------
+  lkIn <- Inf
+  lkDiff = diffTol+1
+  n_it = 1
   XList <- buildX(market = market,timeVec = t,n_basis = K,
                   basis = basisFunction,n_order = n_order)
   X <- XList
-  xbeta <- lapply(X, function(x) apply(beta_init, 2, function(bt) x %*% bt))
-  # yj <- split(y,grps)
-  probTab_init <- matrix(nrow=I*J, ncol=(B))
-  probTab_names <- data.frame(reps = vector(mode=class(reps),length = I*J),
-                              grps = vector(mode=class(grps),length = I*J))
-  k=1
-  for(i in unique(reps)){
-    for(j in unique(grps)){
-      for(b in 1:B){
-        probTab_names$reps[k] = i
-        probTab_names$grps[k] = j
-        yij <- subset(dd, rep==i & group==j)$y
-        probTab_init[k,b] <- mvtnorm::dmvnorm(x = as.numeric(yij),
-                                              mean = as.numeric(c(xbeta[[j]][,b])),
-                                              sigma = as.matrix(sigMtxList[[b]][[j]]),
-                                              log=TRUE)
+  while(lkDiff > diffTol & n_it < itMax){
+    if(verbose)
+      message(paste("\nIteration num ",n_it))
+    ## Compute prob for E-Step
+    sigMtxList <- lapply(1:B, function(b){
+      sig <- covMatrix(market = market,group.name = 'group',
+                       type.name = 'type',mkt.name = 'num',
+                       timeVec = t,sigPar = sigma_init[1,b],
+                       tauPar = NULL,corPar = theta_init[1,b],
+                       funcMtx = NULL,covType = 'Homog_Uniform',
+                       corType = 'periodic',nKnots = NULL,
+                       truncateDec = 8)
+      sig
+    })
+    xbeta <- lapply(X, function(x) apply(beta_init, 2, function(bt) x %*% bt))
+    # yj <- split(y,grps)
+    probTab_init <- matrix(nrow=I*J, ncol=(B))
+    probTab_names <- data.frame(reps = vector(mode=class(reps),length = I*J),
+                                grps = vector(mode=class(grps),length = I*J))
+    k=1
+    for(i in unique(reps)){
+      for(j in unique(grps)){
+        for(b in 1:B){
+          probTab_names$reps[k] = i
+          probTab_names$grps[k] = j
+          yij <- subset(dd, rep==i & group==j)$y
+          probTab_init[k,b] <- mvtnorm::dmvnorm(x = as.numeric(yij),
+                                                mean = as.numeric(c(xbeta[[j]][,b])),
+                                                sigma = as.matrix(sigMtxList[[b]][[j]]),
+                                                log=TRUE)
+        }
+        k=k+1
       }
-      k=k+1
     }
-  }
-  for(k in 1:(I*J)){
+    for(k in 1:(I*J)){
       for(b in 1:B){
         probTab_init[k,b] <- probTab_init[k,b] + log(pi_init[1,b])
       }
-  }
-  denomProb <- log(rowSums(exp(probTab_init)))
-  for(k in 1:(I*J)){
+    }
+    denomProb <- log(rowSums(exp(probTab_init)))
+    probTab_ratio=probTab_init ## initiate
+    for(k in 1:(I*J)){
+      for(b in 1:B){
+        probTab_ratio[k,b] <- probTab_init[k,b] - denomProb[k]
+      }
+      if(all(exp(probTab_ratio[k,])==0) | all(is.infinite(exp(probTab_ratio[k,])))){ ## if all probs are zero
+        b1 <- which.min(probTab_init[k,])
+        probTab_ratio[k,] <- rep(0,times=B)
+        probTab_ratio[k,b1] <- 1
+      }else{
+        probTab_ratio[k,] <- exp(probTab_ratio[k,])
+      }
+    }
+    probTab <- cbind(probTab_names, probTab_ratio)
+    ## M-Step
+    cp <- c(sigma_init,theta_init)
+    opt <- optim(par = cp,
+                 fn = Q_wrapper,
+     #            lower=c(rep(-1e-60,B),rep(0,B)),
+    #             upper=c(rep(1e60,2*B)),
+    #             method = "L-BFGS-B",
+                 data = dd,
+                 market = market,
+                 betaPar = beta_init,
+                 piPar = pi_init,
+                 pTab = probTab,
+                 B=B,
+                 t=t,
+                 K=n_basis,
+                 I=I,
+                 J=J,
+                 basisFunction=basisFunction,
+                 n_order=n_order)
+    lkOut <- opt$value
+    if(verbose) message(paste("\nlk value:", round(lkOut,6)))
+    cp_out <- matrix(opt$par, ncol=2)
+    if(verbose)
+      message(paste("\ncovPar estimates:",paste(round(opt$par,4),collapse=', ')))
+    sigma_out <- cp_out[,1]
+    theta_out <- cp_out[,2]
+    ## COMPUTE BETA'S
+    sigMtxList_out <- lapply(1:B, function(b){
+      sig <- covMatrix(market = market,group.name = 'group',
+                       type.name = 'type',mkt.name = 'num',
+                       timeVec = t,sigPar = sigma_init[b],
+                       tauPar = NULL,corPar = theta_init[b],
+                       funcMtx = NULL,covType = 'Homog_Uniform',
+                       corType = 'periodic',nKnots = NULL,
+                       truncateDec = 8)
+      sig
+    })
+    sigLongList <- lapply(sigMtxList_out,
+                          function(m)
+                            Matrix::bdiag(replicate(n=I,Matrix::bdiag(m))))
+    probLong <- list()
+        for(b in 1:B){
+          probLong[[b]] <- diag(rep(probTab[,b+2],each=T))
+        }
+    # sigLongList <- list()
+    # for(b in 1:B){
+    #   k=1
+    #   tmp <- list()
+    #   for(i in 1:I){
+    #     for(j in 1:J){
+    #       prob_ijb <- subset(probTab, grps==j&reps==i)[,b+2]
+    #       prob_ijb <- as.numeric(prob_ijb)
+    #       tmp[[k]] <- prob_ijb*sigMtxList_out[[b]][[j]]
+    #       k=k+1
+    #     }
+    #   }
+    #   sigLongList[[b]] <- Matrix::bdiag(tmp)
+    # }
+    XLong <- do.call(rbind,XList) ## pile by group
+    XLong <- do.call(rbind, replicate(n=I,XLong, simplify = FALSE)) ## replicate piling
+    beta_out <- beta_init ## initiate
     for(b in 1:B){
-      probTab_init[k,b] <- probTab_init[k,b] - denomProb[k]
+      # tmpLeft <- t(XLong)%*%XLong
+      # tmpRight <- t(XLong)%*%matrix(y,ncol=1)
+      tmpLeft <- t(XLong)%*%probLong[[b]]%*%
+        Matrix::solve(sigLongList[[b]],XLong)
+      tmpRight <- t(XLong)%*%probLong[[b]]%*%
+        Matrix::solve(sigLongList[[b]],matrix(y,ncol=1))
+      beta_out[,b] <- as.numeric(solve(tmpLeft,tmpRight))
     }
-    if(all(exp(probTab_init[k,])==0)){ ## if all probs are zero
-      b1 <- which.min(probTab_init[k,])
-      probTab_init[k,] <- rep(0,times=B)
-      probTab_init[k,b1] <- 1
-    }else{
-      probTab_init[k,] <- exp(probTab_init[k,])
-    }
-  }
-  pTab_init <- cbind(probTab_names, probTab_init)
-
-  ## While loop ------
-  lkDiff = diffTol+1
-  n_it = 1
-  while(lkDiff > diffTol & n_it < itMax){
-  cp <- c(sigma_init,theta_init)
-  opt <- optim(cp,
-               Q_wrapper,
-               lower=c(rep(-Inf,B),rep(0,B)),
-               data = dd,
-               market = market,
-               betaPar = beta_init,
-               piPar = pi_init,
-               B=B,
-               t=t,
-               K=n_basis,
-               I=I,
-               J=J,
-               basisFunction=basisFunction,
-               n_order=n_order
-               )
-  lkOut <- opt$value
-  cp_out <- opt$par
-
-  ## TODO
-  # [] Compute Betas
-  # [] Compute Pi's
-  # [] Check convergence
-  }
-
+    # y1 = XLong %*% beta_out[,1]
+    # y2 = XLong %*% beta_out[,2]
+    # plot(y[1:480],pch=20)
+    # points(y1[1:480],col=2,pch=20)
+    # points(y2[1:480],col=3,pch=20)
+    pi_out <- apply(probTab,2,mean)
+    ## Check convergence & updates
+    lkDiff <- abs(lkIn - lkOut)
+    beta_init <- beta_out
+    pi_init <- matrix(pi_out,ncol=B)
+    sigma_init <- matrix(sigma_out,ncol=B)
+    theta_init <- matrix(theta_out,ncol=B)
+    n_it <- n_it+1
+    lkIn <- lkOut
+  } # end while loop
+  outList <- list("probTab"=probTab,
+                  "betaPar" = beta_out,
+                  "piPar" = pi_out[-c(1:2)],
+                  "sigmaPar" = sigma_out,
+                  "thetaPar" = theta_out)
+  outList
 }
