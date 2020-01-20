@@ -62,6 +62,24 @@ aggrmodel_cluster(
 
 \item{verbose}{TRUE/FALSE indicating if steps of optimization should be printed as messages (Default: FALSE)}
 }
+\value{
+An aggrmodel_cluster object
+}
 \description{
 Fit aggregated model with clusters
+}
+\examples{
+library(dplyr)
+
+data = simuData \%>\%
+  select(group=Group, rep=Rep, time=Time, y=Load)
+df=data
+mkt = market
+mkt$Cluster=NULL
+colnames(mkt) = c('group','type','num')
+
+## Go for a walk after run the code below
+fitCluster = aggrmodel_cluster(data = df, market=mkt, Y = 'y', timeVar =
+'time',groupVar = 'group', repVar = 'rep', n_basis = 7,n_basis_cov = NULL,
+n_cluster = 2,n_trials = 1000, n_order = 4, corType = 'periodic', verbose=TRUE)
 }

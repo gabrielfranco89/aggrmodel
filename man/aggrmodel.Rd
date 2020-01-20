@@ -54,7 +54,7 @@ aggrmodel(
 \item{diffTol}{Tolerance of model covergence}
 }
 \value{
-beta and sigma pars
+An aggrmodel object
 }
 \description{
 Fit Aggregated Model
