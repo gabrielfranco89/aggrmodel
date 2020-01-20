@@ -142,6 +142,8 @@ getClusterInitials <- function(data,
 #' @param itMax Number of maximum iterations of EM algorithm (Default: 100)
 #' @param verbose TRUE/FALSE indicating if steps of optimization should be printed as messages (Default: FALSE)
 #'
+#' @return An aggrmodel_cluster object
+#'
 #' @name aggrmodel_cluster
 #'
 #' @importFrom mvtnorm dmvnorm
@@ -157,7 +159,7 @@ getClusterInitials <- function(data,
 #'
 #' ## Go for a walk after run the code below
 #' fitCluster = aggrmodel_cluster(data = df, market=mkt, Y = 'y', timeVar =
-#' time',groupVar = 'group', repVar = 'rep', n_basis = 7,n_basis_cov = NULL,
+#' 'time',groupVar = 'group', repVar = 'rep', n_basis = 7,n_basis_cov = NULL,
 #' n_cluster = 2,n_trials = 1000, n_order = 4, corType = 'periodic', verbose=TRUE)
 aggrmodel_cluster <- function(formula=NULL,
                               data,
@@ -245,7 +247,6 @@ aggrmodel_cluster <- function(formula=NULL,
       sig
     })
     xbeta <- lapply(X, function(x) apply(beta_init, 2, function(bt) x %*% bt))
-    # yj <- split(y,grps)
     probTab_init <- matrix(nrow=I*J, ncol=(B))
     probTab_names <- data.frame(reps = vector(mode=class(reps),length = I*J),
                                 grps = vector(mode=class(grps),length = I*J))
@@ -328,20 +329,6 @@ aggrmodel_cluster <- function(formula=NULL,
         for(b in 1:B){
           probLong[[b]] <- diag(rep(probTab[,b+2],each=T))
         }
-    # sigLongList <- list()
-    # for(b in 1:B){
-    #   k=1
-    #   tmp <- list()
-    #   for(i in 1:I){
-    #     for(j in 1:J){
-    #       prob_ijb <- subset(probTab, grps==j&reps==i)[,b+2]
-    #       prob_ijb <- as.numeric(prob_ijb)
-    #       tmp[[k]] <- prob_ijb*sigMtxList_out[[b]][[j]]
-    #       k=k+1
-    #     }
-    #   }
-    #   sigLongList[[b]] <- Matrix::bdiag(tmp)
-    # }
     XLong <- do.call(rbind,XList) ## pile by group
     XLong <- do.call(rbind, replicate(n=I,XLong, simplify = FALSE)) ## replicate piling
     beta_out <- beta_init ## initiate
@@ -354,11 +341,6 @@ aggrmodel_cluster <- function(formula=NULL,
         Matrix::solve(sigLongList[[b]],matrix(y,ncol=1))
       beta_out[,b] <- as.numeric(solve(tmpLeft,tmpRight))
     }
-    # y1 = XLong %*% beta_out[,1]
-    # y2 = XLong %*% beta_out[,2]
-    # plot(y[1:480],pch=20)
-    # points(y1[1:480],col=2,pch=20)
-    # points(y2[1:480],col=3,pch=20)
     pi_out <- apply(probTab,2,mean)
     ## Check convergence & updates
     lkDiff <- abs(lkIn - lkOut)
@@ -369,10 +351,50 @@ aggrmodel_cluster <- function(formula=NULL,
     n_it <- n_it+1
     lkIn <- lkOut
   } # end while loop
+  ## OUTPUTS ----
+  predList <- apply(beta_out,2,function(b) XLong %*% b)
+  predList <- unlist(predList)
+  predList <- matrix(predList, ncol=B)
+  predListNames <- paste("cluster",1:B,sep='')
+  colnames(predList) <- predListNames
+  ddOut <- cbind(dd,predList)
+  colnames(probTab)[1:2] <- c('rep','group')
+  ddOut <- merge(ddOut, probTab)
+  ec <- ncol(ddOut)
+  colnames(ddOut)[(ec-B+1):ec] <- paste('p',1:B,sep='')
+  mm<- apply(ddOut[,(ec-B+1):ec],1,which.max)
+  pred <- numeric(nrow(ddOut))
+  for(k in 1:nrow(ddOut)){
+    pred[k]<-ddOut[k,(mm[k]+4)]
+  }
+  ddOut$pred <- pred
+  ddOut <- ddOut[,c(1:4,ncol(ddOut))]
+  ## Mean curves
+  if(basisFunction=='B-Splines')
+    basisObj = create.bspline.basis(range(t),
+                                    nbasis = n_basis,
+                                    norder = n_order)
+  if(basisFunction=='Fourier'){
+    basisObj = create.fourier.basis(range(t),
+                                    nbasis = n_basis)
+  }
+  tuni <- unique(t)
+  basisMtx = predict(basisObj, tuni)
+  basisMtx <- Matrix::bdiag(replicate(C,basisMtx,simplify = FALSE))
+  mc <- apply(beta_out,2,function(b) basisMtx%*%b)
+  mc <- do.call(rbind,mc)
+  mc <- data.frame(cluster = rep(paste('cluster',1:B,sep=''),each=C*T),
+                   type = rep(rep(unique(market$type),each=T),times=B),
+                   time = rep(tuni,times=C*B),
+                   mc = as.numeric(mc))
+  ## return -----
   outList <- list("probTab"=probTab,
                   "betaPar" = beta_out,
                   "piPar" = pi_out[-c(1:2)],
                   "sigmaPar" = sigma_out,
-                  "thetaPar" = theta_out)
+                  "thetaPar" = theta_out,
+                  'predData' = ddOut,
+                  'mc' = mc)
+  class(outList)='aggrmodel_cluster'
   outList
 }

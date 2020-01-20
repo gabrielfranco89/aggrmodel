@@ -17,7 +17,7 @@
 #' @param corType Correlation structure type. One of "periodic" or "exponential"
 #' @param diffTol Tolerance of model covergence
 #'
-#' @return beta and sigma pars
+#' @return An aggrmodel object
 #' @examples
 #' df = subset(simuData, Cluster==1)
 #' mkt = subset(market, Cluster==1)
@@ -104,7 +104,7 @@ aggrmodel <- function(formula=NULL,
                                 cvrtMtx[[j]]
                                 )
             XList[[j]] <-as.matrix(
-                subset(XList[[j]], 
+                subset(XList[[j]],
                        select=-c(rep, group, time))
                 )
             }
@@ -223,7 +223,7 @@ aggrmodel <- function(formula=NULL,
                                       covType = 'Homog',
                                       corType = corType )
         }
-        
+
         sigmaInvList <- lapply(sigmaOutList, qr.solve)
         ## W.3 Obtain beta estimates with previous steps
 
@@ -312,6 +312,7 @@ aggrmodel <- function(formula=NULL,
                 'fitted' = dd)
     if(!is.null(formula))
         outList[['formula']] <- formula
+    class(outList)='aggrmodel'
     return(outList)
 }
 
