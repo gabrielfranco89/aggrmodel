@@ -7,8 +7,6 @@
 buildX(market, timeVec, n_basis, basis = "B-Splines", n_order = 4)
 }
 \arguments{
-\item{market}{Market data frame. MUST be a 3 column dataframe with the following order: Group, Type and Number of subjects}
-
 \item{timeVec}{Vector of sampled times}
 
 \item{n_basis}{Number of basis functions for basis expansion}

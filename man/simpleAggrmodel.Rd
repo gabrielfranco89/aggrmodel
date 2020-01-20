@@ -7,7 +7,15 @@
 simpleAggrmodel(data, market, n_basis, n_order, basisFunction)
 }
 \arguments{
-\item{data}{}
+\item{data}{Dataset containing group, replicates (if any), time and aggregated signal}
+
+\item{market}{Market data frame. MUST be a 3 column dataframe with the following order: Group, Type and Number of subjects}
+
+\item{n_basis}{Number of basis functions for basis expansion}
+
+\item{n_order}{Order of basis Splines (Default: 4)}
+
+\item{basisFunction}{Character indicating which basis: 'B-Splines' (default) or 'Fourier'}
 }
 \value{
 lm object

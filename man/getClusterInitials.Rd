@@ -13,12 +13,16 @@ getClusterInitials(data, market, n_knots, n_order, n_cluster, n_trials, bFunc)
 
 \item{n_knots}{Number of knots to be fitted on simple model}
 
+\item{n_order}{Order of basis Splines (Default: 4)}
+
+\item{n_cluster}{Number of grouping clusters}
+
 \item{n_trials}{Number of random clustering configurations to be fitted}
 
 \item{bFunc}{Basis function to be used: "B-Splines" or "Fourier"}
 }
 \value{
-A data set with "group" and "cluster" indicating the fit with minor squared root error
+A list containing: data set with "group" and "cluster" indicating the fit with minor squared root error and an lm object of the chosen clustering configuration
 }
 \description{
 Fit multiple simple models to obtain the clustering with minor SRE

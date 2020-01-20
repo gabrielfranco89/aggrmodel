@@ -4,7 +4,63 @@
 \alias{aggrmodel_cluster}
 \title{Fit aggregated model with clusters}
 \usage{
-aggrmodel_cluster()
+aggrmodel_cluster(
+  formula = NULL,
+  data,
+  market,
+  Y = NULL,
+  timeVar,
+  groupVar,
+  repVar,
+  n_basis,
+  n_basis_cov = NULL,
+  n_cluster = NULL,
+  n_trials = 42,
+  basisFunction = "B-Splines",
+  n_order = 4,
+  covType = "Homog_Uniform",
+  corType = "periodic",
+  diffTol = 1e-06,
+  itMax = 100,
+  verbose = FALSE
+)
+}
+\arguments{
+\item{formula}{building...}
+
+\item{data}{Dataset containing group, replicates (if any), time and aggregated signal}
+
+\item{market}{Market data frame. MUST be a 3 column dataframe with the following order: Group, Type and Number of subjects}
+
+\item{Y}{Dependent variable: aggregated signal}
+
+\item{timeVar}{Name of time variable}
+
+\item{groupVar}{Name of grouping variable}
+
+\item{repVar}{Name of replicates variable}
+
+\item{n_basis}{Number of basis functions for basis expansion}
+
+\item{n_basis_cov}{Number of basis functions for variance functional expansion}
+
+\item{n_cluster}{Number of grouping clusters}
+
+\item{n_trials}{Number of random grouping trials for cluster initial values (Default: 42 and don't forget your towel!)}
+
+\item{basisFunction}{Character indicating which basis: 'B-Splines' (default) or 'Fourier'}
+
+\item{n_order}{Order of basis Splines (Default: 4)}
+
+\item{covType}{Covariance functional type. One of "Homog_Uniform" (default), "Homog" or "Heterog"}
+
+\item{corType}{Correlation structure type. One of "periodic" (default) or "exponential"}
+
+\item{diffTol}{Tolerance of model covergence (Default: 1e-06)}
+
+\item{itMax}{Number of maximum iterations of EM algorithm (Default: 100)}
+
+\item{verbose}{TRUE/FALSE indicating if steps of optimization should be printed as messages (Default: FALSE)}
 }
 \description{
 Fit aggregated model with clusters
