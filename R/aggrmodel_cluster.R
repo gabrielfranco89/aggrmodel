@@ -1,11 +1,11 @@
 #' Fit a simple aggregated model
 #' @name simpleAggrmodel
 #'
-#' @param market
-#' @param n_basis
-#' @param n_order
-#' @param basisFunction
-#' @param data
+#' @param market Market data frame. MUST be a 3 column dataframe with the following order: Group, Type and Number of subjects
+#' @param n_basis  Number of basis functions for basis expansion
+#' @param n_order Order of basis Splines (Default: 4)
+#' @param basisFunction Character indicating which basis: 'B-Splines' (default) or 'Fourier'
+#' @param data Dataset containing group, replicates (if any), time and aggregated signal
 #'
 #' @return lm object
 #' @export
@@ -37,11 +37,14 @@ simpleAggrmodel <- function(data,
 
 #' Fit multiple simple models to obtain the clustering with minor SRE
 #' @name getClusterInitials
+#'
 #' @param data Must be an ordered data frame by rep > group > time with theses names
 #' @param market A data frame with columns group, type and num
 #' @param n_knots Number of knots to be fitted on simple model
 #' @param n_trials Number of random clustering configurations to be fitted
 #' @param bFunc Basis function to be used: "B-Splines" or "Fourier"
+#' @param n_order Order of basis Splines (Default: 4)
+#' @param n_cluster Number of grouping clusters
 #'
 #' @return A list containing: data set with "group" and "cluster" indicating the fit with minor squared root error and an lm object of the chosen clustering configuration
 #' @export
@@ -120,28 +123,42 @@ getClusterInitials <- function(data,
 
 #' Fit aggregated model with clusters
 #'
-#' @param formula
-#' @param data
-#' @param market
-#' @param Y
-#' @param timeVar
-#' @param groupVar
-#' @param repVar
-#' @param n_basis
-#' @param n_basis_cov
-#' @param basisFunction
-#' @param n_order
-#' @param covType
-#' @param corType
-#' @param diffTol
-#' @param n_cluster
-#' @param n_trials
-#' @param itMax
+#' @param formula building...
+#' @param data  Dataset containing group, replicates (if any), time and aggregated signal
+#' @param market Market data frame. MUST be a 3 column dataframe with the following order: Group, Type and Number of subjects
+#' @param Y Dependent variable: aggregated signal
+#' @param timeVar Name of time variable
+#' @param groupVar Name of grouping variable
+#' @param repVar Name of replicates variable
+#' @param n_basis Number of basis functions for basis expansion
+#' @param n_basis_cov Number of basis functions for variance functional expansion
+#' @param basisFunction Character indicating which basis: 'B-Splines' (default) or 'Fourier'
+#' @param n_order Order of basis Splines (Default: 4)
+#' @param covType Covariance functional type. One of "Homog_Uniform" (default), "Homog" or "Heterog"
+#' @param corType Correlation structure type. One of "periodic" (default) or "exponential"
+#' @param diffTol Tolerance of model covergence (Default: 1e-06)
+#' @param n_cluster Number of grouping clusters
+#' @param n_trials Number of random grouping trials for cluster initial values (Default: 42 and don't forget your towel!)
+#' @param itMax Number of maximum iterations of EM algorithm (Default: 100)
+#' @param verbose TRUE/FALSE indicating if steps of optimization should be printed as messages (Default: FALSE)
 #'
 #' @name aggrmodel_cluster
 #'
 #' @importFrom mvtnorm dmvnorm
 #' @export
+#' @examples library(dplyr)
+#'
+#' data = simuData %>%
+#'   select(group=Group, rep=Rep, time=Time, y=Load)
+#' df=data
+#' mkt = market
+#' mkt$Cluster=NULL
+#' colnames(mkt) = c('group','type','num')
+#'
+#' ## Go for a walk after run the code below
+#' fitCluster = aggrmodel_cluster(data = df, market=mkt, Y = 'y', timeVar =
+#' time',groupVar = 'group', repVar = 'rep', n_basis = 7,n_basis_cov = NULL,
+#' n_cluster = 2,n_trials = 1000, n_order = 4, corType = 'periodic', verbose=TRUE)
 aggrmodel_cluster <- function(formula=NULL,
                               data,
                               market,

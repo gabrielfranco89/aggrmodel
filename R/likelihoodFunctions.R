@@ -1,7 +1,7 @@
 #' Build design matrix to fit aggregated model
 #'
 #' @name buildX
-#' @param market Market data frame. MUST be a 3 column dataframe with the following order: Group, Type and Number of subjects
+#' @param market
 #' @param timeVec Vector of sampled times
 #' @param basis Character indicating which basis: 'B-Splines' or 'Fourier'
 #' @param n_basis Number of basis functions for basis expansion
@@ -194,19 +194,17 @@ loglikWrapper <- function(pars,
 ##   ╚═╝╩ ╩  ╚  └─┘┘└┘└─┘ ┴ ┴└─┘┘└┘└─┘
 ## ================================================
 
-#' Title
+#' Function to be maximized in aggrmodel_cluster function
 #'
-#' @param data
-#' @param sigmaList
-#' @param xbetaList
-#' @param probTab
-#' @param B
+#' @param data Data Frame with 4 columns in the following order: Group, Replicates, Time, Signal
+#' @param sigmaList List of covariance matrices for each group
+#' @param xbetaList List of estimated signal for each group
+#' @param probTab Data frame of expected probabilities from E-Step containing a group variable, replicate variable and cluster probabilities
+#' @param B Number of grouping clusters
 #'
-#' @return
+#' @return A scalar likelihood value
 #' @export
 #' @importFrom mvtnorm dmvnorm
-#'
-#' @examples
 Q_function <- function(data,sigmaList,xbetaList,probTab,B){
     logLikOut=0
     for(j in unique(data$group)){
@@ -230,30 +228,27 @@ Q_function <- function(data,sigmaList,xbetaList,probTab,B){
 }
 
 
-#' Title
+#' Wrapper for M-Step function evaluation
 #'
-#' @param covPar
-#' @param data
-#' @param market
-#' @param betaPar
-#' @param piPar
-#' @param B
-#' @param t
-#' @param K
-#' @param basisFunction
-#' @param n_order
-#' @param pTab
-#' @param I
-#' @param J
+#' @param covPar Covariance parameters
+#' @param data Data Frame with 4 columns in the following order: Group, Replicates, Time, Signal
+#' @param market Data Frame with 4 columns in the following order: Group, Replicates, Time, Signal
+#' @param betaPar Mean curves parameters
+#' @param piPar Probabilities parameters
+#' @param B Number of grouping clusters
+#' @param t Time vector
+#' @param K Number of basis functions
+#' @param basisFunction Character indicating which basis: 'B-Splines' (default) or 'Fourier'
+#' @param n_order Order of basis Splines (Default: 4)
+#' @param pTab Data frame of expected probabilities from E-Step containing a group variable, replicate variable and cluster probabilities
+#' @param I Number of replicates
+#' @param J Number of groups
 #'
 #' @return
 #' @export
-#'
-#' @examples
 Q_wrapper <- function(covPar,data,market,betaPar,piPar,pTab,B,t,K,I,J,
                       basisFunction,n_order){
     covPar <- matrix(covPar, nrow=B)
-    ## Get probTabs
     sigMtxList <- lapply(1:B, function(b){
         sig <- covMatrix(market = market,group.name = 'group',
                          type.name = 'type',mkt.name = 'num',
@@ -266,59 +261,12 @@ Q_wrapper <- function(covPar,data,market,betaPar,piPar,pTab,B,t,K,I,J,
     })
     XList <- buildX(market = market,timeVec = t,n_basis = K,
                     basis = basisFunction,n_order = n_order)
-    # X <- lapply(XList,
-    #             function(x)
-    #               do.call(rbind,replicate(n=I,
-    #                                       expr=x,
-    #                                       simplify=FALSE)
-    #               )
-    # )
     X <- XList
     xbeta <- lapply(X, function(x) apply(betaPar, 2, function(bt) x %*% bt))
-    # yj <- split(y,grps)
-    # probTab_init <- matrix(nrow=I*J, ncol=(B))
-    # probTab_names <- data.frame(reps = vector(mode=class(data$rep),length = I*J),
-    #                             grps = vector(mode=class(data$group),length = I*J))
-    # k=1
-    # for(i in unique(data$rep)){
-    #     for(j in unique(data$group)){
-    #         for(b in 1:B){
-    #             probTab_names$reps[k] = i
-    #             probTab_names$grps[k] = j
-    #             yij <- subset(data, rep==i & group==j)$y
-    #             probTab_init[k,b] <- mvtnorm::dmvnorm(x = as.numeric(yij),
-    #                                                   mean = as.numeric(c(xbeta[[j]][,b])),
-    #                                                   sigma = as.matrix(sigMtxList[[b]][[j]]),
-    #                                                   log=TRUE)
-    #
-    #         }
-    #         k=k+1
-    #     }
-    # }
-    # for(k in 1:(I*J)){
-    #     for(b in 1:B){
-    #         probTab_init[k,b] <- probTab_init[k,b] + log(piPar[1,b])
-    #     }
-    # }
-    # denomProb <- log(rowSums(exp(probTab_init)))
-    # for(k in 1:(I*J)){
-    #     for(b in 1:B){
-    #         probTab_init[k,b] <- probTab_init[k,b] - denomProb[k]
-    #     }
-    #     if(all(exp(probTab_init[k,])==0)){ ## if all probs are zero
-    #         b1 <- which.min(probTab_init[k,])
-    #         probTab_init[k,] <- rep(0,times=B)
-    #         probTab_init[k,b1] <- 1
-    #     }else{
-    #         probTab_init[k,] <- exp(probTab_init[k,])
-    #     }
-    # }
-    # pTab_init <- cbind(probTab_names, probTab_init)
     ## SEND TO Q_Function
     Q_function(data=data,
                sigmaList = sigMtxList,
                xbetaList = xbeta,
                probTab = pTab,
                B=B)
-
-    }
+}
