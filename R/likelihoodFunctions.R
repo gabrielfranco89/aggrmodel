@@ -243,6 +243,9 @@ Q_function <- function(data,sigmaList,xbetaList,probTab,B){
 #' @param pTab Data frame of expected probabilities from E-Step containing a group variable, replicate variable and cluster probabilities
 #' @param I Number of replicates
 #' @param J Number of groups
+#' @param C Number of consumer types
+#' @param covWrap covariance structure
+#' @param corWrap correlation structure
 #'
 #' @return
 #' @export

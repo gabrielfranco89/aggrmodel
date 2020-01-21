@@ -141,6 +141,7 @@ getClusterInitials <- function(data,
 #' @param n_trials Number of random grouping trials for cluster initial values (Default: 42 and don't forget your towel!)
 #' @param itMax Number of maximum iterations of EM algorithm (Default: 100)
 #' @param verbose TRUE/FALSE indicating if steps of optimization should be printed as messages (Default: FALSE)
+#' @param cicleRep Indicator TRUE/FALSE if replicates are cyclical
 #'
 #' @return An aggrmodel_cluster object
 #'
@@ -173,7 +174,7 @@ aggrmodel_cluster <- function(formula=NULL,
                               n_cluster = NULL,
                               n_trials = 42,
                               basisFunction = 'B-Splines',
-                              ##cicleRep = FALSE,
+                              cicleRep = FALSE,
                               n_order = 4,
                               covType = 'Homog_Uniform',
                               corType = 'periodic',
@@ -269,16 +270,6 @@ aggrmodel_cluster <- function(formula=NULL,
         sig
       })
     }
-    # sigMtxList <- lapply(1:B, function(b){
-    #   sig <- covMatrix(market = market,group.name = 'group',
-    #                    type.name = 'type',mkt.name = 'num',
-    #                    timeVec = t,sigPar = sigma_init[1,b],
-    #                    tauPar = NULL,corPar = theta_init[1,b],
-    #                    funcMtx = NULL,covType = 'Homog_Uniform',
-    #                    corType = 'periodic',nKnots = NULL,
-    #                    truncateDec = 8)
-    #   sig
-    # })
     xbeta <- lapply(X, function(x) apply(beta_init, 2, function(bt) x %*% bt))
     probTab_init <- matrix(nrow=I*J, ncol=(B))
     probTab_names <- data.frame(reps = vector(mode=class(reps),length = I*J),
@@ -318,11 +309,7 @@ aggrmodel_cluster <- function(formula=NULL,
       }
     }
     probTab <- cbind(probTab_names, probTab_ratio)
-    ## M-Step
-    # if(covType == 'Homog_Uniform')
-    #   cp_in <- c(sigma_init,theta_init)
-    # if(covType == 'Homog')
-    #   cp_in <- c(rep(sigma_init,C),rep(theta_init,3))
+    ## M-Step ----
     opt <- optim(par = cp_in,
                  fn = Q_wrapper,
                  #            lower=c(rep(-1e-60,B),rep(0,B)),
@@ -385,18 +372,50 @@ aggrmodel_cluster <- function(formula=NULL,
         for(b in 1:B){
           probLong[[b]] <- diag(rep(probTab[,b+2],each=T))
         }
-    ## COMPUTE BETAs
+    ## COMPUTE BETAs ----
     XLong <- do.call(rbind,XList) ## pile by group
     XLong <- do.call(rbind, replicate(n=I,XLong, simplify = FALSE)) ## replicate piling
     beta_out <- beta_init ## initiate
     for(b in 1:B){
-      # tmpLeft <- t(XLong)%*%XLong
-      # tmpRight <- t(XLong)%*%matrix(y,ncol=1)
       tmpLeft <- t(XLong)%*%probLong[[b]]%*%
         Matrix::solve(sigLongList[[b]],XLong)
       tmpRight <- t(XLong)%*%probLong[[b]]%*%
         Matrix::solve(sigLongList[[b]],matrix(y,ncol=1))
-      beta_out[,b] <- as.numeric(solve(tmpLeft,tmpRight))
+      if(cicleRep){
+        ## Note: Here we use a(0) = a(T) restriction
+        if(basisFunction=='B-Splines')
+          basisObj = create.bspline.basis(range(t),
+                                          nbasis = n_basis,
+                                          norder = n_order)
+        if(basisFunction=='Fourier'){
+          basisObj = create.fourier.basis(range(t),
+                                          nbasis = n_basis)
+        }
+        Phi = predict(basisObj, t)
+        deltaVec <- matrix(Phi[1,] - Phi[nrow(Phi),],nrow=1)
+        ## Get lambdas
+        ## I can vectorize later (maybe)
+        m1List <- split(x=qr.solve(tmpLeft),
+                        f=rep(1:C, each=n_basis))
+        m2List <- split(x=tmpRight,
+                        f=rep(1:C, each=n_basis))
+        lambda <- matrix(numeric(C),nrow=1)
+        for(c in 1:C){
+          lUp <- deltaVec%*%
+            matrix(m1List[[c]],
+                   nrow=n_basis)[,(n_basis*(c-1)+1):(c*n_basis)]%*%
+            matrix(m2List[[c]],ncol=1)
+          lDown <- deltaVec%*%
+            matrix(m1List[[c]],
+                   nrow=n_basis)[,(n_basis*(c-1)+1):(c*n_basis)]%*%
+            t(deltaVec)
+          lambda[1,c] <- lUp/lDown
+        }
+        Rvec <- lambda %x% deltaVec
+        beta_out[,b] <- as.numeric(Matrix::solve(tmpLeft, (tmpRight - t(Rvec))))
+      } else {
+        beta_out[,b] <- as.numeric(Matrix::solve(tmpLeft,tmpRight))
+      } ## end if/else cicle
     }
     pi_out <- apply(probTab,2,mean)
     ## Check convergence & updates
