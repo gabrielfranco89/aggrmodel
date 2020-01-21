@@ -246,8 +246,10 @@ Q_function <- function(data,sigmaList,xbetaList,probTab,B){
 #'
 #' @return
 #' @export
-Q_wrapper <- function(covPar,data,market,betaPar,piPar,pTab,B,t,K,I,J,
-                      basisFunction,n_order){
+Q_wrapper <- function(covPar,data,market,betaPar,piPar,pTab,B,t,K,C,I,J,
+                      basisFunction,n_order,
+                      covWrap, corWrap){
+    if(covWrap == 'Homog_Uniform'){
     covPar <- matrix(covPar, nrow=B)
     sigMtxList <- lapply(1:B, function(b){
         sig <- covMatrix(market = market,group.name = 'group',
@@ -255,10 +257,24 @@ Q_wrapper <- function(covPar,data,market,betaPar,piPar,pTab,B,t,K,I,J,
                          timeVec = t,sigPar = covPar[b,1],
                          tauPar = NULL,corPar = covPar[b,2],
                          funcMtx = NULL,covType = 'Homog_Uniform',
-                         corType = 'periodic',nKnots = NULL,
+                         corType = corWrap, nKnots = NULL,
                          truncateDec = 8)
         sig
     })
+    } ## end if cov homog_uniform
+    if(covWrap == 'Homog'){
+        covPar <- matrix(covPar, ncol=B,byrow=TRUE)
+        sigMtxList <- lapply(1:B, function(b){
+            sig <- covMatrix(market = market,group.name = 'group',
+                             type.name = 'type',mkt.name = 'num',
+                             timeVec = t,sigPar = covPar[1:C,b],
+                             tauPar = NULL,corPar = covPar[(C+1):(2*C),b],
+                             funcMtx = NULL,covType = 'Homog',
+                             corType = corWrap, nKnots = NULL,
+                             truncateDec = 8)
+            sig
+        })
+    }
     XList <- buildX(market = market,timeVec = t,n_basis = K,
                     basis = basisFunction,n_order = n_order)
     X <- XList
