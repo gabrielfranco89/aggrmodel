@@ -223,6 +223,12 @@ aggrmodel_cluster <- function(formula=NULL,
   sigma_init <- unlist(lapply(cl_init[[2]],function(x) summary(x)$sigma))
   sigma_init <- matrix(sqrt(sigma_init), ncol=B)
   theta_init <- matrix(10, ncol=B)
+  if(covType == 'Homog_Uniform'){
+    cp_in <- c(sigma_init,theta_init)
+  }
+  if(covType == 'Homog'){
+    cp_in <- c(rep(sigma_init,C),rep(theta_init,3))
+  }
   pi_init <- prop.table(table(cluster_init[,2]))
   pi_init <- matrix(pi_init, ncol=B)
   ## While loop ------
@@ -232,20 +238,47 @@ aggrmodel_cluster <- function(formula=NULL,
   XList <- buildX(market = market,timeVec = t,n_basis = K,
                   basis = basisFunction,n_order = n_order)
   X <- XList
+
   while(lkDiff > diffTol & n_it < itMax){
     if(verbose)
       message(paste("\nIteration num ",n_it))
     ## Compute prob for E-Step
-    sigMtxList <- lapply(1:B, function(b){
-      sig <- covMatrix(market = market,group.name = 'group',
-                       type.name = 'type',mkt.name = 'num',
-                       timeVec = t,sigPar = sigma_init[1,b],
-                       tauPar = NULL,corPar = theta_init[1,b],
-                       funcMtx = NULL,covType = 'Homog_Uniform',
-                       corType = 'periodic',nKnots = NULL,
-                       truncateDec = 8)
-      sig
-    })
+    if(covType == 'Homog_Uniform'){
+      covPar <- matrix(cp_in, nrow=B)
+      sigMtxList <- lapply(1:B, function(b){
+        sig <- covMatrix(market = market,group.name = 'group',
+                         type.name = 'type',mkt.name = 'num',
+                         timeVec = t,sigPar = covPar[b,1],
+                         tauPar = NULL,corPar = covPar[b,2],
+                         funcMtx = NULL,covType = 'Homog_Uniform',
+                         corType = corType,nKnots = NULL,
+                         truncateDec = 8)
+        sig
+      })
+    }
+    if(covType == 'Homog'){
+      covPar <- matrix(cp_in, ncol=B,byrow=TRUE)
+      sigMtxList <- lapply(1:B, function(b){
+        sig <- covMatrix(market = market,group.name = 'group',
+                         type.name = 'type',mkt.name = 'num',
+                         timeVec = t,sigPar = covPar[1:C,b],
+                         tauPar = NULL,corPar = covPar[(C+1):(2*C),b],
+                         funcMtx = NULL,covType = 'Homog',
+                         corType = corType,nKnots = NULL,
+                         truncateDec = 8)
+        sig
+      })
+    }
+    # sigMtxList <- lapply(1:B, function(b){
+    #   sig <- covMatrix(market = market,group.name = 'group',
+    #                    type.name = 'type',mkt.name = 'num',
+    #                    timeVec = t,sigPar = sigma_init[1,b],
+    #                    tauPar = NULL,corPar = theta_init[1,b],
+    #                    funcMtx = NULL,covType = 'Homog_Uniform',
+    #                    corType = 'periodic',nKnots = NULL,
+    #                    truncateDec = 8)
+    #   sig
+    # })
     xbeta <- lapply(X, function(x) apply(beta_init, 2, function(bt) x %*% bt))
     probTab_init <- matrix(nrow=I*J, ncol=(B))
     probTab_names <- data.frame(reps = vector(mode=class(reps),length = I*J),
@@ -286,12 +319,15 @@ aggrmodel_cluster <- function(formula=NULL,
     }
     probTab <- cbind(probTab_names, probTab_ratio)
     ## M-Step
-    cp <- c(sigma_init,theta_init)
-    opt <- optim(par = cp,
+    # if(covType == 'Homog_Uniform')
+    #   cp_in <- c(sigma_init,theta_init)
+    # if(covType == 'Homog')
+    #   cp_in <- c(rep(sigma_init,C),rep(theta_init,3))
+    opt <- optim(par = cp_in,
                  fn = Q_wrapper,
-     #            lower=c(rep(-1e-60,B),rep(0,B)),
-    #             upper=c(rep(1e60,2*B)),
-    #             method = "L-BFGS-B",
+                 #            lower=c(rep(-1e-60,B),rep(0,B)),
+                 #             upper=c(rep(1e60,2*B)),
+                 #             method = "L-BFGS-B",
                  data = dd,
                  market = market,
                  betaPar = beta_init,
@@ -302,33 +338,54 @@ aggrmodel_cluster <- function(formula=NULL,
                  K=n_basis,
                  I=I,
                  J=J,
+                 C=C,
                  basisFunction=basisFunction,
-                 n_order=n_order)
+                 n_order=n_order,
+                 covWrap=covType,
+                 corWrap=corType
+    )
     lkOut <- opt$value
     if(verbose) message(paste("\nlk value:", round(lkOut,6)))
-    cp_out <- matrix(opt$par, ncol=2)
-    if(verbose)
-      message(paste("\ncovPar estimates:",paste(round(opt$par,4),collapse=', ')))
-    sigma_out <- cp_out[,1]
-    theta_out <- cp_out[,2]
-    ## COMPUTE BETA'S
-    sigMtxList_out <- lapply(1:B, function(b){
-      sig <- covMatrix(market = market,group.name = 'group',
-                       type.name = 'type',mkt.name = 'num',
-                       timeVec = t,sigPar = sigma_init[b],
-                       tauPar = NULL,corPar = theta_init[b],
-                       funcMtx = NULL,covType = 'Homog_Uniform',
-                       corType = 'periodic',nKnots = NULL,
-                       truncateDec = 8)
-      sig
-    })
-    sigLongList <- lapply(sigMtxList_out,
-                          function(m)
-                            Matrix::bdiag(replicate(n=I,Matrix::bdiag(m))))
+    cp_out <-opt$par
+    if(verbose) message(paste("\ncovPar estimates:",paste(round(opt$par,4),collapse=', ')))
+    ## Covariance matrices out ----
+    if(covType=='Homog_Uniform'){
+      covPar <- matrix(cp_out, nrow=B)
+      sigMtxList_out <- lapply(1:B, function(b){
+        sig <- covMatrix(market = market,group.name = 'group',
+                         type.name = 'type',mkt.name = 'num',
+                         timeVec = t,sigPar = covPar[b,1],
+                         tauPar = NULL,corPar = covPar[b,2],
+                         funcMtx = NULL,covType = 'Homog_Uniform',
+                         corType = corType,nKnots = NULL,
+                         truncateDec = 8)
+        sig
+      })
+      sigLongList <- lapply(sigMtxList_out,
+                            function(m)
+                              Matrix::bdiag(replicate(n=I,Matrix::bdiag(m))))
+    }
+    if(covType=='Homog'){
+      covPar <- matrix(cp_out, ncol=B,byrow=TRUE)
+      sigMtxList_out <- lapply(1:B, function(b){
+        sig <- covMatrix(market = market,group.name = 'group',
+                         type.name = 'type',mkt.name = 'num',
+                         timeVec = t,sigPar = covPar[1:C,b],
+                         tauPar = NULL,corPar = covPar[(C+1):(2*C),b],
+                         funcMtx = NULL,covType = 'Homog',
+                         corType = corType,nKnots = NULL,
+                         truncateDec = 8)
+        sig
+      })
+      sigLongList <- lapply(sigMtxList_out,
+                            function(m)
+                              Matrix::bdiag(replicate(n=I,Matrix::bdiag(m))))
+    }
     probLong <- list()
         for(b in 1:B){
           probLong[[b]] <- diag(rep(probTab[,b+2],each=T))
         }
+    ## COMPUTE BETAs
     XLong <- do.call(rbind,XList) ## pile by group
     XLong <- do.call(rbind, replicate(n=I,XLong, simplify = FALSE)) ## replicate piling
     beta_out <- beta_init ## initiate
@@ -346,8 +403,7 @@ aggrmodel_cluster <- function(formula=NULL,
     lkDiff <- abs(lkIn - lkOut)
     beta_init <- beta_out
     pi_init <- matrix(pi_out,ncol=B)
-    sigma_init <- matrix(sigma_out,ncol=B)
-    theta_init <- matrix(theta_out,ncol=B)
+    cp_in <- cp_out
     n_it <- n_it+1
     lkIn <- lkOut
   } # end while loop
@@ -391,8 +447,7 @@ aggrmodel_cluster <- function(formula=NULL,
   outList <- list("probTab"=probTab,
                   "betaPar" = beta_out,
                   "piPar" = pi_out[-c(1:2)],
-                  "sigmaPar" = sigma_out,
-                  "thetaPar" = theta_out,
+                  "covPar" = covPar,
                   'predData' = ddOut,
                   'mc' = mc)
   class(outList)='aggrmodel_cluster'
