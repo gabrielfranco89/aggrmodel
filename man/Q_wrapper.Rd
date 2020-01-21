@@ -14,10 +14,13 @@ Q_wrapper(
   B,
   t,
   K,
+  C,
   I,
   J,
   basisFunction,
-  n_order
+  n_order,
+  covWrap,
+  corWrap
 )
 }
 \arguments{
@@ -39,6 +42,8 @@ Q_wrapper(
 
 \item{K}{Number of basis functions}
 
+\item{C}{Number of consumer types}
+
 \item{I}{Number of replicates}
 
 \item{J}{Number of groups}
@@ -46,6 +51,10 @@ Q_wrapper(
 \item{basisFunction}{Character indicating which basis: 'B-Splines' (default) or 'Fourier'}
 
 \item{n_order}{Order of basis Splines (Default: 4)}
+
+\item{covWrap}{covariance structure}
+
+\item{corWrap}{correlation structure}
 }
 \value{
 

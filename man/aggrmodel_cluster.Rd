@@ -17,6 +17,7 @@ aggrmodel_cluster(
   n_cluster = NULL,
   n_trials = 42,
   basisFunction = "B-Splines",
+  cicleRep = FALSE,
   n_order = 4,
   covType = "Homog_Uniform",
   corType = "periodic",
@@ -49,6 +50,8 @@ aggrmodel_cluster(
 \item{n_trials}{Number of random grouping trials for cluster initial values (Default: 42 and don't forget your towel!)}
 
 \item{basisFunction}{Character indicating which basis: 'B-Splines' (default) or 'Fourier'}
+
+\item{cicleRep}{Indicator TRUE/FALSE if replicates are cyclical}
 
 \item{n_order}{Order of basis Splines (Default: 4)}
 
