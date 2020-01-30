@@ -16,13 +16,9 @@ createCorBase <- function(timeVec){
                  j = rep(time, times = T)
                  )
     tmp$diff = tmp$i - tmp$j
-
-
     mtxOut  <- matrix(tmp[,3],
                       nrow = T,
                       ncol = T)
-
-
     return(mtxOut)
 }
 
@@ -49,21 +45,16 @@ createCorBase <- function(timeVec){
 periodicCorMtx <- function(timeVec,
                            corPar,
                            truncateDec = NULL){
-    ## require(Matrix)
-
     baseMtx <- createCorBase(timeVec)
-
-    mtx <- apply(baseMtx, 2, function(x) exp(-2* (sin(pi*x)^2)*abs(corPar^2 )))
-
+    ## mtx <- apply(baseMtx,
+    ##              2,
+    ##              function(x) exp(-2* (sin(pi*x)^2)*corPar))
+    baseMtx <- pi*baseMtx
+    baseMtx <- sin(baseMtx)^2
+    mtx <- exp(-2* baseMtx * corPar)
     if(!is.null(truncateDec)) mtx <- round(mtx,truncateDec)
-
-    ## mtx <- as(mtx, 'symmetricMatrix')
-
     return(mtx)
-
 }
-
-## Ornstein–Uhlenbeck (exponential) ------------------
 
 #' Exponential correlation matrix
 #'
@@ -85,18 +76,10 @@ periodicCorMtx <- function(timeVec,
 #' @export
 expCorMtx <- function(timeVec, corPar,
                       truncateDec = NULL){
-    ## require(Matrix)
-
     baseMtx <- createCorBase(timeVec)
-
-    mtx <- apply(baseMtx, 2, function(x) exp(-abs(x)*abs(corPar)))
-
+    mtx <- exp(-2*abs(baseMtx)*corPar)
     if(!is.null(truncateDec)) mtx <- round(mtx,truncateDec)
-
-    ## mtx <- as(mtx, 'symmetricMatrix')
-
     return(mtx)
-
 }
 
 
@@ -112,14 +95,14 @@ expCorMtx <- function(timeVec, corPar,
 #' @details
 #' The functional variance matrix is a matrix with diagonal of elements:
 #'
-#' \deqn{v(t) = \sigma \, (\eta(t))^{-\tau}}
+#' \deqn{v(t) = \sigma \, (\eta(t))^{\tau}}
 #'
 #' @return A square functional variace matrix with size = \code{length(functionalVec)}
 #' @export
 createVarMtx <- function(functionalVec,
                             sigPar,
                             tauPar){
-    diagVec = sigPar*(functionalVec^(-tauPar))
+    diagVec = sigPar*(functionalVec^(tauPar))
     mtx <- diag(x=diagVec) ##, names=FALSE)
     return(mtx)
 }
@@ -228,7 +211,7 @@ covMatrix <- function(market,
         if(corType == 'exponential')
             cc <- expCorMtx(timeVec = t,
                             corPar = corPar,
-                            truncateDec = Par)
+                            truncateDec = truncateDec)
         covMtx  <- vc %*% cc %*% vc
         covMtxList <- tapply(market[,3], market[,1],
                        function(m){
