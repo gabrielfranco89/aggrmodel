@@ -15,7 +15,10 @@
 #' @param cicleRep Indicator TRUE/FALSE if replicates are cyclical
 #' @param covType Covariance functional type. One of "Homog_Uniform", "Homog" or "Heterog"
 #' @param corType Correlation structure type. One of "periodic" or "exponential"
+#' @param corPar_init Numeric: Initial value for correlation parameters (default:20)
+#' @param tauPar_init Numeric: Initial value for expoent parameters of complete covariance (default:0.5)
 #' @param diffTol Tolerance of model covergence
+#' @param verbose TRUE/FALSE prints likelihood values during optimization
 #'
 #' @return An aggrmodel object
 #' @examples
@@ -41,6 +44,10 @@ aggrmodel <- function(formula=NULL,
                       n_order = 4,
                       covType = 'Homog_Uniform',
                       corType = 'periodic',
+                      corPar_init = 20,
+                      tauPar_init = .5,
+                      optimMethod = "L-BFGS-B",
+                      verbose = FALSE,
                       diffTol = 1e-6){
 
 
@@ -128,23 +135,23 @@ aggrmodel <- function(formula=NULL,
     ## 1.1 Create parVec according to covType and corType
     if(covType == 'Homog_Uniform'){
         sigPar <- sigma_init
-        corPar <- 180
+        corPar <- corPar_init
         parIn <- c(sigPar, corPar)
         lowBoundVec <- c(-Inf, 0)
     }
 
     if(covType == 'Homog'){
         sigPar <- rep(sigma_init,C)
-        corPar <- rep(180, C)
+        corPar <- rep(corPar_init, C)
         parIn <- c(sigPar, corPar)
         lowBoundVec <- c(rep(-Inf,C), rep(0,C))
     }
     if(covType == 'Heterog'){
         ## <----------------------- UNDER CONSTRUCTION
         if(is.null(n_basis_cov)){
-            warning(paste("Using the same number of basis of model fit:",n_basis))
+            warning("Using the same number of basis of model fit:",n_basis)
             n_basis_cov <- n_basis
-            sigPar <- beta_init
+            betaCov_init <- beta_init
         } else {
             ## fit new object for heterog.
             XListCov <- buildX(market=market,
@@ -163,14 +170,14 @@ aggrmodel <- function(formula=NULL,
             Xcov <- cbind(dd, Xcov)
             Xcov <- Xcov[,-c(1:3)]
             fit_init_cov <- lm(y~.-1, data = Xcov)
-            beta_init_cov <- coef(fit_init)
-            sigPar <- beta_init_cov
+            betaCov_init <- coef(fit_init_cov)
         } # end if/else
-        sigPar <- beta_init
-        corPar <- rep(180, C)
-        tauPar <- rep(.5, C)
-        parIn <- c(sigPar, corPar, tauPar)
-        lowBoundVec <- c(rep(-Inf,C*n_basis_cov),
+        sigPar <- rep(sigma_init, C)/unlist(tapply(betaCov_init,
+                                                   rep(1:C, each=n_basis_cov),FUN=mean))
+        corPar <- rep(corPar_init, C)
+        tauPar <- rep(tauPar_init, C)
+        parIn <- c(betaCov_init,sigPar, corPar, tauPar)
+        lowBoundVec <- c(rep(-Inf,times=(C*n_basis_cov+C)),
                          rep(0,2*C)) ## tau's > 0?
         ## UNDER CONSTRUCTION ---------------------->
     }# end if heterog
@@ -194,8 +201,10 @@ aggrmodel <- function(formula=NULL,
                      designListWrap = XList,
                      nCons = C,
                      lower = lowBoundVec,
-                     method = "L-BFGS-B",
-                     nBasisCov = n_basis_cov)
+                     method = optimMethod,
+                     nBasisCov = n_basis_cov,
+                     nOrderCov = n_order,
+                     verbWrap = verbose)
         parOut <- opt$par
         lkOut <- opt$value
         ## message('\nLikehood =', lkOut)
@@ -203,7 +212,7 @@ aggrmodel <- function(formula=NULL,
         ## W.2 Update Sigma estimates
         if(covType == 'Homog_Uniform'){
             sigmaOutList <- covMatrix(market = market,
-                                      group.name = 'Group',
+                                      group.name = 'group',
                                       type.name = 'type',
                                       mkt.name = 'mkt',
                                       timeVec = dd$time,
@@ -214,7 +223,7 @@ aggrmodel <- function(formula=NULL,
         }
         if(covType == 'Homog'){
             sigmaOutList <- covMatrix(market = market,
-                                      group.name = 'Group',
+                                      group.name = 'group',
                                       type.name = 'type',
                                       mkt.name = 'mkt',
                                       timeVec = dd$time,
@@ -223,6 +232,35 @@ aggrmodel <- function(formula=NULL,
                                       covType = 'Homog',
                                       corType = corType )
         }
+        if(covType == 'Heterog'){
+            tvec <- unique(t)
+            basisObj = create.bspline.basis(range(tvec),
+                                            nbasis = n_basis_cov,
+                                            norder = n_order)
+            B <- predict(basisObj, tvec)
+            betaMC <- parOut[1:(C*n_basis_cov)]
+            betaMtx <- cbind(beta=as.matrix(betaMC),
+                             type=rep(1:C, each=n_basis_cov))
+            mcMtx <- tapply(betaMtx[,1],
+                            betaMtx[,2],
+                            function(x) B %*% x)
+            funcVarIn <- matrix(unlist(mcMtx), ncol = C)
+            sigParIn <- parOut[(C*n_basis_cov+1):(length(parOut)-(2*C))]
+            corParIn <- parOut[(C*n_basis_cov+C+1):(length(parOut)-C)]
+            tauParIn  <- parOut[((length(parOut)-C+1):length(parOut))]
+            sigmaOutList <- covMatrix(market = market,
+                                   group.name = 'group',
+                                   type.name = 'type',
+                                   mkt.name = 'mkt',
+                                   timeVec = dd$time,
+                                   funcMtx = funcVarIn,
+                                   sigPar = sigParIn,
+                                   corPar = corParIn,
+                                   tauPar = tauParIn,
+                                   covType = 'Heterog',
+                                   corType = corType )
+        }
+
 
         sigmaInvList <- lapply(sigmaOutList, qr.solve)
         ## W.3 Obtain beta estimates with previous steps
@@ -312,6 +350,8 @@ aggrmodel <- function(formula=NULL,
                 'fitted' = dd)
     if(!is.null(formula))
         outList[['formula']] <- formula
+    if(covType=='Heterog')
+        outList["covCurves"] <- funcVarIn
     class(outList)='aggrmodel'
     return(outList)
 }

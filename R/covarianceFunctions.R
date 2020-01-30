@@ -224,40 +224,34 @@ covMatrix <- function(market,
     if(covType == 'Homog'){
      if(any(length(sigPar) != C,
             length(corPar) != C))
-            stop('Please, check number of parameters for homogeneous model!')
-        covMtxListC <- lapply(1:C,
-                              function(c, sigParIn, corParIn, trc, t){
+         stop('Please, check number of parameters for homogeneous model!')
+     covMtxListC  <- list()
+     for(c in 1:C){
+         vc <- createVarMtx(functionalVec = rep(1,T),
+                            sigPar = sigPar[c],
+                            tauPar = rep(0,C))
 
-                                  vc <- createVarMtx(functionalVec = rep(1,T),
-                                                     sigPar = sigParIn[c],
-                                                     tauPar = rep(0,C))
+         if(corType == 'periodic')
+             cc <- periodicCorMtx(timeVec = t,
+                                  corPar = corPar[c],
+                                  truncateDec = truncateDec)
 
-                                  if(corType == 'periodic')
-                                      cc <- periodicCorMtx(timeVec = t,
-                                                           corPar = corParIn[c],
-                                                           truncateDec = trc)
+         if(corType == 'exponential')
+             cc <- expCorMtx(timeVec = t,
+                             corPar = corPar[c],
+                             truncateDec = truncateDec)
 
-                                  if(corType == 'exponential')
-                                      cc <- expCorMtx(timeVec = t,
-                                                      corPar = corParIn[c],
-                                                      truncateDec = trc)
-
-                                  return( vc %*% cc %*% vc)
-
-                              },
-                              corParIn = corPar,
-                              sigParIn = sigPar,
-                              trc = truncateDec,
-                              t=t)
-        covMtxList = lapply(mktComp,
-                     function(mj, cMtx, C){
-                         mm = lapply(1:C,
-                                    function(c) mj[c] * cMtx[[c]])
-                         return(Reduce('+', mm))
-                     },
-                     cMtx = covMtxListC,
-                     C=C
-                     )
+         covMtxListC[[c]] <- vc %*% cc %*% vc
+     }
+     covMtxList = lapply(mktComp,
+                         function(mj){
+                             mm <- NULL
+                             for(c in 1:C){
+                                 mm <- mm+ mj[c]*covMtxListC[[c]]
+                             }
+                             mm
+                         }
+                         )
     } # end if homog
 
     ## Heterogeneous ::::::::::::::::::::::::::::::::::::
