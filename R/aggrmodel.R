@@ -47,6 +47,7 @@ aggrmodel <- function(formula=NULL,
                       corPar_init = 20,
                       tauPar_init = .5,
                       optimMethod = "L-BFGS-B",
+                      truncateDec = 8,
                       verbose = FALSE,
                       diffTol = 1e-6){
 
@@ -137,14 +138,18 @@ aggrmodel <- function(formula=NULL,
         sigPar <- sigma_init
         corPar <- corPar_init
         parIn <- c(sigPar, corPar)
-        lowBoundVec <- c(-Inf, 0)
+        lowBoundVec <- c(-Inf, 1e-20)
+        ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
+        upperBoundVec <- c(Inf, ubCor)
     }
 
     if(covType == 'Homog'){
         sigPar <- rep(sigma_init,C)
         corPar <- rep(corPar_init, C)
         parIn <- c(sigPar, corPar)
-        lowBoundVec <- c(rep(-Inf,C), rep(0,C))
+        lowBoundVec <- c(rep(-Inf,C), rep(1e-20,C))
+        ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
+        upperBoundVec <- c(rep(Inf,C), rep(ubCor,C))
     }
     if(covType == 'Heterog'){
         ## <----------------------- UNDER CONSTRUCTION
@@ -179,7 +184,9 @@ aggrmodel <- function(formula=NULL,
         parIn <- c(betaCov_init,sigPar, corPar, tauPar)
         lowBoundVec <- c(rep(-Inf,times=(C*n_basis_cov+C)),
                          rep(0,2*C)) ## tau's > 0?
-        ## UNDER CONSTRUCTION ---------------------->
+        ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
+        upperBoundVec <- c(rep(Inf,times=(C*n_basis_cov+C)),
+                         rep(ubCor,C), rep(Inf,C)) ## tau's > 0?
     }# end if heterog
 
     ## While preamble
@@ -201,9 +208,11 @@ aggrmodel <- function(formula=NULL,
                      designListWrap = XList,
                      nCons = C,
                      lower = lowBoundVec,
+                     upper = upperBoundVec,
                      method = optimMethod,
                      nBasisCov = n_basis_cov,
                      nOrderCov = n_order,
+                     truncateDec = truncateDec,
                      verbWrap = verbose)
         parOut <- opt$par
         lkOut <- opt$value
@@ -219,7 +228,8 @@ aggrmodel <- function(formula=NULL,
                                       sigPar = parOut[1],
                                       corPar = parOut[2],
                                       covType = 'Homog_Uniform',
-                                      corType = corType )
+                                      corType = corType,
+                                      truncateDec = truncateDec)
         }
         if(covType == 'Homog'){
             sigmaOutList <- covMatrix(market = market,
@@ -230,7 +240,8 @@ aggrmodel <- function(formula=NULL,
                                       sigPar = parOut[1:C],
                                       corPar = parOut[(C+1):(2*C)],
                                       covType = 'Homog',
-                                      corType = corType )
+                                      corType = corType,
+                                      truncateDec = truncateDec)
         }
         if(covType == 'Heterog'){
             tvec <- unique(t)
@@ -258,7 +269,8 @@ aggrmodel <- function(formula=NULL,
                                    corPar = corParIn,
                                    tauPar = tauParIn,
                                    covType = 'Heterog',
-                                   corType = corType )
+                                   corType = corType,
+                                   truncateDec = truncateDec)
         }
 
 

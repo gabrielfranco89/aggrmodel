@@ -120,6 +120,7 @@ logLikelihood <- function(data,
 #' @param nBasisCov number of basis functions for functional variance
 #' @param nOrderCov order of basis functions for functional variance
 #' @param verbWrap TRUE/FALSE prints likelihood values during optimization
+#' @param truncateDec Integer: Decimal to be truncated in exponential functional
 #' @export
 loglikWrapper <- function(pars,
                           dataWrap,
@@ -131,7 +132,8 @@ loglikWrapper <- function(pars,
                           nCons,
                           nBasisCov,
                           nOrderCov, ## for heterog model
-                          verbWrap
+                          verbWrap,
+                          truncateDec = NULL
                           ){
     muList <- lapply(designListWrap,
                      function(x) as.matrix(x) %*% matrix(betaWrap,
@@ -145,7 +147,8 @@ loglikWrapper <- function(pars,
                                sigPar = pars[1],
                                corPar = pars[2],
                                covType = 'Homog_Uniform',
-                               corType = corWrap )
+                               corType = corWrap,
+                               truncateDec = truncateDec)
     }
     if(covWrap == 'Homog'){
         C <- length(unique(mktWrap[,2]))
@@ -157,7 +160,8 @@ loglikWrapper <- function(pars,
                                sigPar = pars[1:C],
                                corPar = pars[(C+1):(2*C)],
                                covType = 'Homog',
-                               corType = corWrap )
+                               corType = corWrap,
+                               truncateDec = truncateDec)
     }
     if(covWrap == 'Heterog'){
         ## <-------------------- UNDER CONSTRUCTION
@@ -187,14 +191,18 @@ loglikWrapper <- function(pars,
                                corPar = corParIn,
                                tauPar = tauParIn,
                                covType = 'Heterog',
-                               corType = corWrap )
+                               corType = corWrap,
+                               truncateDec = truncateDec)
         ## UNDER CONSTRUCTION -------------------->
     }
     lk <- logLikelihood(data = dataWrap,
                         muVecList = muList,
                         covMtxList = sigmaList
                         )
-    if(verbWrap)
+    if(is.infinite(lk))
+        lk <- .Machine$double.xmax
+    
+    if(all(verbWrap & covWrap=='Heterog'))
         message("\n lk =", round(lk,6),
                 "\n mean(betaPar) =", paste(round(apply(funcVarIn,2,mean),
                                                4),
@@ -203,7 +211,12 @@ loglikWrapper <- function(pars,
                 "\n corPar =", paste(round(corParIn,4), collapse=','),
                 "\n tauPar =", paste(round(tauParIn,4), collapse=',')
                 )
-
+        if(all(verbWrap & !covWrap=='Heterog'))
+        message("\n lk =", round(lk,6),
+                "\n pars =", paste(round(pars,2),
+                                           collapse=',')
+                )
+        
     return(lk)
 }
 
