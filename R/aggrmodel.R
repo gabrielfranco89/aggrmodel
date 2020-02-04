@@ -47,7 +47,7 @@ aggrmodel <- function(formula=NULL,
                       corPar_init = 20,
                       tauPar_init = .5,
                       optimMethod = "L-BFGS-B",
-                      truncateDec = 8,
+                      truncateDec = NULL,
                       verbose = FALSE,
                       diffTol = 1e-6){
 
@@ -61,31 +61,28 @@ aggrmodel <- function(formula=NULL,
         stop("Wrong corType option! Argument must be periodic or exponential.")
     if(basisFunction == 'Fourier' && n_basis%%2!=1)
         stop('For Fourier basis, n_basis must be an odd number!')
-
+    if(ncol(market) != 3)
+        stop('Market must have 3 columns in the following order: Group, Type and Number of subjects. Please check your market input.')
+    
     ## Preamble
-    require(Matrix,quietly=TRUE)
-
     y = data[[substitute(Y)]]
     t = data[[substitute(timeVar)]]
     t = t/max(t)
-    grps = data[[substitute(groupVar)]]
-    reps = data[[substitute(repVar)]]
-
+    grps = as.factor(data[[substitute(groupVar)]])
+    reps = as.factor(data[[substitute(repVar)]])
     J = length(unique(grps))
     I = length(unique(reps))
     T = length(unique(t))
     C = length(unique(market[,2]))
-
-    dd <- data.frame(group=grps,
-                     rep=reps,
+    dd <- data.frame(group=as.integer(grps),
+                     rep=as.integer(reps),
                      time=t,
                      y = y)
-    dd <- dd[order(dd[,2], dd[,1], dd[,3]),]
-    y <- dd[,4]
-
-    ## Check market
-    if(ncol(market) != 3)
-        stop('Market must have 3 columns in the following order: Group, Type and Number of subjects. Please check your market input.')
+    dd <- dd[order(dd$group, dd$rep, dd$time),]
+    y <- dd$y
+    colnames(market) <- c("group","type","num")
+    market$group <- as.integer(factor(market$group,
+                                      levels=levels(grps)))
 
     ## Build disgragation basis expansion design matrix
     XList <- buildX(market=market,
@@ -118,6 +115,7 @@ aggrmodel <- function(formula=NULL,
             }
         rm(cvrtMtx)
     } ## end if is.null(formula)
+    ## Build long X ------------------------------
     X <- lapply(XList,
                  function(x)
                      do.call(rbind,replicate(n=I,
@@ -126,13 +124,13 @@ aggrmodel <- function(formula=NULL,
                              )
                  )
     X <- do.call(rbind, X)
-    X <- cbind(dd, X)
-    X <- X[,-c(1:3)]
-    fit_init <- lm(y~.-1, data = X)
+    ## Get beta init -----------------------------
+    ddfit_init <- data.frame(y=y,X)
+    fit_init <- lm(y~.-1, data = ddfit_init)
     beta_init <- coef(fit_init)
     sigma_init <- sqrt(summary(fit_init)$sigma)
-
-    ## Step 1: obtain Sigma estimates
+    rm(ddfit_init)
+    ## Step 1: obtain Sigma estimates --------------------
     ## 1.1 Create parVec according to covType and corType
     if(covType == 'Homog_Uniform'){
         sigPar <- sigma_init
@@ -275,16 +273,14 @@ aggrmodel <- function(formula=NULL,
 
 
         sigmaInvList <- lapply(sigmaOutList, qr.solve)
-        ## W.3 Obtain beta estimates with previous steps
 
-        sigmaInv <- bdiag(sigmaInvList)
-        sigmaInv <- bdiag(replicate(n=I,
-                                    expr=sigmaInv,
-                                    simplify=FALSE))
-        X <- do.call(rbind, XList)
-        X <- do.call(rbind, replicate(n=I,
-                                      expr=X,
-                                      simplify=FALSE))
+        ## W.3 Obtain beta estimates with previous steps
+        sigmaInv <- lapply(sigmaInvList, function(x)
+            bdiag(replicate(n=I,
+                      expr=x,
+                      simplify=FALSE))
+            )
+        sigmaInv <- bdiag(sigmaInv)
         betaLeft <- t(X)%*%sigmaInv%*%X
         betaRight <- t(X)%*%sigmaInv%*%y
         if(cicleRep){
@@ -353,6 +349,10 @@ aggrmodel <- function(formula=NULL,
                         type=rep(unique(market[,2]), each=length(tuni)))
     ## Output data with predicted values
     dd$pred <- as.numeric(X %*% betaOut)
+    dd$group <- as.factor(dd$group)
+    levels(dd$group) <- levels(grps)
+    dd$rep <- as.factor(dd$rep)
+    levels(dd$rep) <- levels(reps)
     ## Return
     outList <- list('beta' = as.matrix(betaOut),
                 'pars' = parOut,
