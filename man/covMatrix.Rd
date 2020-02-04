@@ -15,7 +15,7 @@ covMatrix(
   corPar,
   funcMtx = NULL,
   covType,
-  corType = "periodic",
+  corType = "exponential",
   nKnots = NULL,
   truncateDec = NULL
 )
