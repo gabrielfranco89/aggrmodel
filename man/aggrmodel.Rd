@@ -19,6 +19,11 @@ aggrmodel(
   n_order = 4,
   covType = "Homog_Uniform",
   corType = "periodic",
+  corPar_init = 20,
+  tauPar_init = 0.5,
+  optimMethod = "L-BFGS-B",
+  truncateDec = NULL,
+  verbose = FALSE,
   diffTol = 1e-06
 )
 }
@@ -50,6 +55,12 @@ aggrmodel(
 \item{covType}{Covariance functional type. One of "Homog_Uniform", "Homog" or "Heterog"}
 
 \item{corType}{Correlation structure type. One of "periodic" or "exponential"}
+
+\item{corPar_init}{Numeric: Initial value for correlation parameters (default:20)}
+
+\item{tauPar_init}{Numeric: Initial value for expoent parameters of complete covariance (default:0.5)}
+
+\item{verbose}{TRUE/FALSE prints likelihood values during optimization}
 
 \item{diffTol}{Tolerance of model covergence}
 }

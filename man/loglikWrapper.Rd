@@ -13,7 +13,10 @@ loglikWrapper(
   betaWrap,
   designListWrap,
   nCons,
-  nBasisCov
+  nBasisCov,
+  nOrderCov,
+  verbWrap,
+  truncateDec = NULL
 )
 }
 \arguments{
@@ -34,6 +37,12 @@ loglikWrapper(
 \item{nCons}{number of types of consumers}
 
 \item{nBasisCov}{number of basis functions for functional variance}
+
+\item{nOrderCov}{order of basis functions for functional variance}
+
+\item{verbWrap}{TRUE/FALSE prints likelihood values during optimization}
+
+\item{truncateDec}{Integer: Decimal to be truncated in exponential functional}
 }
 \description{
 Wrapper for log-likelihood evaluation

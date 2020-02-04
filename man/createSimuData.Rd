@@ -5,18 +5,24 @@
 \title{Simulate aggregated data}
 \usage{
 createSimuData(
-  nGroups = 10,
+  B1 = 4,
+  B2 = 6,
+  nRep = 20,
   market = NULL,
-  market_range = 1:100,
-  sigPar = c(2, 2, 2),
-  tauPar = c(0.5, 0.5, 0.5),
-  corPar = c(13, 13, 13),
+  market_range = 20:80,
+  sigPar = c(2, 2, 2, 4, 4, 4),
+  tauPar = c(0.5, 0.5, 0.5, 0.4, 0.4, 0.4),
+  corPar = c(4, 4, 4, 6, 6, 6),
   seed = NULL,
   tempPar = 1
 )
 }
 \arguments{
-\item{nGroups}{Number of groups to be simulated}
+\item{B1}{Number of groups from cluster 1}
+
+\item{B2}{Number of groups from cluster 2}
+
+\item{nRep}{Number of replicates}
 
 \item{market}{Optional. Insert the market as a data frame with the columns 'group', 'type' and 'num'}
 
@@ -33,12 +39,12 @@ createSimuData(
 \item{tempPar}{Default:1. If you do not want temperature effect, set temPar=0}
 }
 \value{
-Return a data frame with 20 replicates and 3 types of consumer observed in 48 times.
+Return a data frame with nRep replicates and 3 types of consumer observed in 48 times. Parameters and market are returned as attributes.
 }
 \description{
 Simulate aggregated data
 }
 \examples{
 dd = createSimuData()
-dd = createSimuData(nGroups=4)
+dd = createSimuData(B1=4, B2=8)
 }

@@ -22,5 +22,5 @@ Functional variance matrix
 \details{
 The functional variance matrix is a matrix with diagonal of elements:
 
-\deqn{v(t) = \sigma \, (\eta(t))^{-\tau}}
+\deqn{v(t) = \sigma \, (\eta(t))^{\tau}}
 }
