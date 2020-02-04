@@ -169,14 +169,14 @@ covMatrix <- function(market,
                       corPar,
                       funcMtx = NULL,
                       covType,
-                      corType = 'periodic',
+                      corType = 'exponential',
                       nKnots = NULL,
                       truncateDec = NULL
                       ){
-    require(Matrix,quietly=TRUE)
-    require(dplyr,quietly=TRUE)
-    require(purrr,quietly=TRUE)
-    require(tidyr,quietly=TRUE)
+    ## require(Matrix,quietly=TRUE)
+    ## require(dplyr,quietly=TRUE)
+    ## require(purrr,quietly=TRUE)
+    ## require(tidyr,quietly=TRUE)
     select <- dplyr::select
 
     ## Preamble
@@ -213,11 +213,9 @@ covMatrix <- function(market,
                             corPar = corPar,
                             truncateDec = truncateDec)
         covMtx  <- vc %*% cc %*% vc
-        covMtxList <- tapply(market[,3], market[,1],
-                       function(m){
-                           tmp <- lapply(m, function(mjc) mjc*covMtx)
-                           Reduce('+', tmp)
-                       })
+        mj <- tapply(myMkt$num, myMkt$group, sum)
+        covMtxList <- lapply(mj, function(m) m*covMtx)
+        names(covMtxList) <- unique(myMkt$group)
     } # end if homog unif
 
     ## Homog ::::::::::::::::::::::::::::::::::::::::
@@ -245,7 +243,9 @@ covMatrix <- function(market,
      }
      covMtxList = lapply(mktComp,
                          function(mj){
-                             mm <- NULL
+                             mm <- matrix(0,
+                                          nrow=nrow(covMtxListC[[1]]),
+                                          ncol=ncol(covMtxListC[[1]]))
                              for(c in 1:C){
                                  mm <- mm+ mj[c]*covMtxListC[[c]]
                              }
