@@ -130,6 +130,7 @@ aggrmodel <- function(formula=NULL,
     parIn <- init$par
     lowerBoundVec <- init$lb
     upperBoundVec <- init$ub
+    n_basis_cov <- init$n_basis_cov
     
     ## While ----------------------------------------
     betaIn = beta_init
@@ -415,5 +416,6 @@ get_inits <- function(XList, I, y, C,
     output$lb <- lowBoundVec
     output$ub <- upperBoundVec
     output$par <- parIn
+    output$n_basis_cov <- n_basis_cov
     output
 }
