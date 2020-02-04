@@ -67,7 +67,6 @@ buildX <- function(market,
 #' @return Log-likehood value
 #' @import mvtnorm
 #' @export
-
 logLikelihood <- function(data,
                           muVecList,
                           covMtxList){
@@ -89,7 +88,7 @@ logLikelihood <- function(data,
         actualSigma <- as.matrix(covMtxList[[j]])
 
 
-        logLik <- tapply(subData[,4], subData[,2],
+        logLik <- tapply(subData$y, subData$rep,
                          FUN=dmvnorm,
                          mean = actualMu,
                          sigma = actualSigma,
