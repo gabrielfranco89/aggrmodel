@@ -111,90 +111,31 @@ aggrmodel <- function(formula=NULL,
             XList[[j]] <-as.matrix(
                 subset(XList[[j]],
                        select=-c(rep, group, time))
-                )
-            }
+            )
+        }
         rm(cvrtMtx)
     } ## end if is.null(formula)
-    ## Build long X ------------------------------
-    X <- lapply(XList,
-                 function(x)
-                     do.call(rbind,replicate(n=I,
-                                             expr=x,
-                                             simplify=FALSE)
-                             )
-                 )
-    X <- do.call(rbind, X)
-    ## Get beta init -----------------------------
-    ddfit_init <- data.frame(y=y,X)
-    fit_init <- lm(y~.-1, data = ddfit_init)
-    beta_init <- coef(fit_init)
-    sigma_init <- sqrt(summary(fit_init)$sigma)
-    rm(ddfit_init)
-    ## Step 1: obtain Sigma estimates --------------------
-    ## 1.1 Create parVec according to covType and corType
-    if(covType == 'Homog_Uniform'){
-        sigPar <- sigma_init
-        corPar <- corPar_init
-        parIn <- c(sigPar, corPar)
-        lowBoundVec <- c(-Inf, 1e-20)
-        ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
-        upperBoundVec <- c(Inf, ubCor)
-    }
-
-    if(covType == 'Homog'){
-        sigPar <- rep(sigma_init,C)
-        corPar <- rep(corPar_init, C)
-        parIn <- c(sigPar, corPar)
-        lowBoundVec <- c(rep(-Inf,C), rep(1e-20,C))
-        ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
-        upperBoundVec <- c(rep(Inf,C), rep(ubCor,C))
-    }
-    if(covType == 'Heterog'){
-        ## <----------------------- UNDER CONSTRUCTION
-        if(is.null(n_basis_cov)){
-            warning("Using the same number of basis of model fit:",n_basis)
-            n_basis_cov <- n_basis
-            betaCov_init <- beta_init
-        } else {
-            ## fit new object for heterog.
-            XListCov <- buildX(market=market,
-                            timeVec = t,
-                            n_basis = n_basis_cov,
-                            n_order = n_order,
-                            basis = basisFunction)
-            Xcov <- lapply(XListCov,
-                        function(x)
-                            do.call(rbind,replicate(n=I,
-                                                    expr=x,
-                                                    simplify=FALSE)
-                                    )
-                        )
-            Xcov <- do.call(rbind, Xcov)
-            Xcov <- cbind(dd, Xcov)
-            Xcov <- Xcov[,-c(1:3)]
-            fit_init_cov <- lm(y~.-1, data = Xcov)
-            betaCov_init <- coef(fit_init_cov)
-        } # end if/else
-        sigPar <- rep(sigma_init, C)/unlist(tapply(betaCov_init,
-                                                   rep(1:C, each=n_basis_cov),FUN=mean))
-        corPar <- rep(corPar_init, C)
-        tauPar <- rep(tauPar_init, C)
-        parIn <- c(betaCov_init,sigPar, corPar, tauPar)
-        lowBoundVec <- c(rep(-Inf,times=(C*n_basis_cov+C)),
-                         rep(0,2*C)) ## tau's > 0?
-        ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
-        upperBoundVec <- c(rep(Inf,times=(C*n_basis_cov+C)),
-                         rep(ubCor,C), rep(Inf,C)) ## tau's > 0?
-    }# end if heterog
-
-    ## While preamble
+    ## Get initial values -------------------------------------
+    init <- get_inits(XList=XList, I=I, y=y, C=C,
+                      covType=covType,
+                      market=market,
+                      corPar_init=corPar_init,
+                      tauPar_init=tauPar_init,
+                      truncateDec=truncateDec,
+                      n_basis=n_basis, n_basis_cov=n_basis_cov,
+                      t=t, n_order=n_order, basisFunc=basisFunc
+                      )
+    X <- init$X
+    beta_init <- init$beta
+    parIn <- init$par
+    lowerBoundVec <- init$lb
+    upperBoundVec <- init$ub
+    
+    ## While ----------------------------------------
     betaIn = beta_init
     lkDiff = diffTol + 1
     lkIn = Inf
-
-    ## While loop
     while(lkDiff > diffTol){
-
         ## W.1 Obtain covariance estimates via optim
         opt <- optim(par = parIn,
                      fn = loglikWrapper,
@@ -205,7 +146,7 @@ aggrmodel <- function(formula=NULL,
                      betaWrap = betaIn,
                      designListWrap = XList,
                      nCons = C,
-                     lower = lowBoundVec,
+                     lower = lowerBoundVec,
                      upper = upperBoundVec,
                      method = optimMethod,
                      nBasisCov = n_basis_cov,
@@ -214,7 +155,6 @@ aggrmodel <- function(formula=NULL,
                      verbWrap = verbose)
         parOut <- opt$par
         lkOut <- opt$value
-        ## message('\nLikehood =', lkOut)
 
         ## W.2 Update Sigma estimates
         if(covType == 'Homog_Uniform'){
@@ -368,4 +308,112 @@ aggrmodel <- function(formula=NULL,
     return(outList)
 }
 
+##' Aux function to get initial values in aggrmodel function
+##'
+##' @title get_inits
+##' @param XList Design matrix list
+##' @param I Number of replicates
+##' @param y Dependent variable
+##' @param C Number of subject types
+##' @param covType Covariance structure type
+##' @param market Model market
+##' @param corPar_init Initial value for correlation parameters
+##' @param tauPar_init Initial value for covariance parameter
+##' @param truncateDec Decimal to be truncated
+##' @param n_basis Number of basis function in model fit
+##' @param n_basis_cov Number of basis function in heterogeneous case
+##' @param t time vector
+##' @param n_order Order of basis
+##' @param basisFunc Basis function type
+##' @return An object with initial values
+##' @author Gabriel Franco
+get_inits <- function(XList, I, y, C,
+                      covType,
+                       market,
+                       corPar_init, tauPar_init,
+                       truncateDec,
+                       n_basis, n_basis_cov,
+                       t, n_order, basisFunc
+                       ){
 
+    X <- lapply(XList,
+                function(x)
+                    do.call(rbind,replicate(n=I,
+                                            expr=x,
+                                            simplify=FALSE)
+                            )
+                )
+    X <- do.call(rbind, X)
+    ## Get beta init -----------------------------
+    ddfit_init <- data.frame(y=y,X)
+    fit_init <- lm(y~.-1, data = ddfit_init)
+    beta_init <- coef(fit_init)
+    sigma_init <- sqrt(summary(fit_init)$sigma)
+    rm(ddfit_init)
+ 
+    if(covType == 'Homog_Uniform'){
+        sigPar <- sigma_init
+        corPar <- corPar_init
+        parIn <- c(sigPar, corPar)
+        lowBoundVec <- c(-Inf, 1e-20)
+        ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
+        upperBoundVec <- c(Inf, ubCor)
+    }
+
+    if(covType == 'Homog'){
+        sigPar <- rep(sigma_init,C)
+        corPar <- rep(corPar_init, C)
+        parIn <- c(sigPar, corPar)
+        lowBoundVec <- c(rep(-Inf,C), rep(1e-20,C))
+        ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
+        upperBoundVec <- c(rep(Inf,C), rep(ubCor,C))
+    }
+    if(covType == 'Heterog'){
+        ## <----------------------- UNDER CONSTRUCTION
+        if(is.null(n_basis_cov)){
+            warning("Using the same number of basis of model fit:",n_basis)
+            n_basis_cov <- n_basis
+            betaCov_init <- beta_init
+        } else {
+            ## fit new object for heterog.
+            XListCov <- buildX(market=market,
+                            timeVec = t,
+                            n_basis = n_basis_cov,
+                            n_order = n_order,
+                            basis = basisFunction)
+            Xcov <- lapply(XListCov,
+                        function(x)
+                            do.call(rbind,replicate(n=I,
+                                                    expr=x,
+                                                    simplify=FALSE)
+                                    )
+                        )
+            Xcov <- do.call(rbind, Xcov)
+            Xcov <- cbind(dd, Xcov)
+            Xcov <- Xcov[,-c(1:3)]
+            fit_init_cov <- lm(y~.-1, data = Xcov)
+            betaCov_init <- coef(fit_init_cov)
+        } # end if/else
+        sigPar <- rep(sigma_init, C)/unlist(tapply(betaCov_init,
+                                                   rep(1:C, each=n_basis_cov),FUN=mean))
+        corPar <- rep(corPar_init, C)
+        tauPar <- rep(tauPar_init, C)
+        parIn <- c(betaCov_init,sigPar, corPar, tauPar)
+        lowBoundVec <- c(rep(-Inf,times=(C*n_basis_cov+C)),
+                         rep(0,2*C)) ## tau's > 0?
+        ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
+        upperBoundVec <- c(rep(Inf,times=(C*n_basis_cov+C)),
+                         rep(ubCor,C), rep(Inf,C)) ## tau's > 0?
+    }# end if heterog
+
+    output <- list()
+    ## output$sigPar <- sigPar
+    ## output$corPar <- corPar
+    ## output$tauPar <- tauPar
+    output$X <- X
+    output$beta <- beta_init
+    output$lb <- lowBoundVec
+    output$ub <- upperBoundVec
+    output$par <- parIn
+    output
+}
