@@ -4,12 +4,12 @@
 \alias{logLikelihood}
 \title{Compute log-likelihood for aggregated model}
 \usage{
-logLikelihood(data, muVecList, covMtxList)
+logLikelihood(data, muVec, covMtxList)
 }
 \arguments{
 \item{data}{Data Frame with 4 columns in the following order: Group, Replicates, Time, Signal}
 
-\item{muVecList}{List of \eqn{X\beta} for each group}
+\item{muVec}{Vector \eqn{X\beta} of fitted values}
 
 \item{covMtxList}{List of covariance matrices for each group}
 }

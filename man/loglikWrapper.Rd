@@ -11,7 +11,7 @@ loglikWrapper(
   covWrap,
   corWrap,
   betaWrap,
-  designListWrap,
+  designWrap,
   nCons,
   nBasisCov,
   nOrderCov,
@@ -32,7 +32,7 @@ loglikWrapper(
 
 \item{betaWrap}{beta parameter}
 
-\item{designListWrap}{list of design matrices for each group}
+\item{designWrap}{Design matrix}
 
 \item{nCons}{number of types of consumers}
 
