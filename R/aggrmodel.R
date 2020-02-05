@@ -63,7 +63,7 @@ aggrmodel <- function(formula=NULL,
         stop('For Fourier basis, n_basis must be an odd number!')
     if(ncol(market) != 3)
         stop('Market must have 3 columns in the following order: Group, Type and Number of subjects. Please check your market input.')
-    
+
     ## Preamble
     y = data[[substitute(Y)]]
     t = data[[substitute(timeVar)]]
@@ -131,7 +131,7 @@ aggrmodel <- function(formula=NULL,
     lowerBoundVec <- init$lb
     upperBoundVec <- init$ub
     n_basis_cov <- init$n_basis_cov
-    
+
     ## While ----------------------------------------
     betaIn = beta_init
     lkDiff = diffTol + 1
@@ -145,7 +145,7 @@ aggrmodel <- function(formula=NULL,
                      dataWrap = dd,
                      mktWrap = market,
                      betaWrap = betaIn,
-                     designListWrap = XList,
+                     designWrap = X,
                      nCons = C,
                      lower = lowerBoundVec,
                      upper = upperBoundVec,
@@ -351,7 +351,7 @@ get_inits <- function(XList, I, y, C,
     beta_init <- coef(fit_init)
     sigma_init <- sqrt(summary(fit_init)$sigma)
     rm(ddfit_init)
- 
+
     if(covType == 'Homog_Uniform'){
         sigPar <- sigma_init
         corPar <- corPar_init
