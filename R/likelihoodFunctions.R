@@ -1,11 +1,17 @@
 #' Build design matrix to fit aggregated model
 #'
 #' @name buildX
-#' @param market
+#'
 #' @param timeVec Vector of sampled times
 #' @param basis Character indicating which basis: 'B-Splines' or 'Fourier'
 #' @param n_basis Number of basis functions for basis expansion
 #' @param n_order Order of basis splines (Default: 4)
+#' @param marketLong Market indexed by group and rep
+#' @param nType Number of subjects type
+#' @param timeVec2 Vector of second functional component
+#' @param n_basis2 Number of basis function for timeVec2 expansion
+#' @param basis2 Character indicating which basis: 'B-Splines' or 'Fourier'
+#' @param n_order2 Order of B-Splines (Default:4)
 #'
 #' @return List of basis matrices for each group in market[,1]
 #' @examples
@@ -18,25 +24,21 @@
 #' designList = buildX(myMkt, myTimeVec, n_basis = 5)
 #' str(designList)
 #' @import fda
-#' @import tidyr
-#' @import mvtnorm
 #' @export
 
-buildX <- function(market,
+buildX <- function(marketLong,
+                   nType,
                    timeVec,
                    n_basis,
                    basis = 'B-Splines',
-                   n_order = 4 ## Cubic Splines (default)
+                   n_order = 4,
+                   timeVec2=NULL,
+                   n_basis2=NULL,
+                   basis2=NULL,
+                   n_order2=NULL
                    ){
-
-    ## Preamble
-    require(fda, quietly=TRUE)
-    require(tidyr, quietly=TRUE)
-    C <- length(unique(market[,2]))
-    J <- length(unique(market[,1]))
-
-    ## Create basis matrix B
-    t <- unique(timeVec)
+    C <- nType
+    t <- timeVec
     if(basis=='B-Splines')
         basisObj = create.bspline.basis(range(t),
                                         nbasis = n_basis,
@@ -46,13 +48,34 @@ buildX <- function(market,
                                         nbasis = n_basis)
     }
     B = predict(basisObj, t)
-
-    ## Kronecker product with market
-    X <- tapply(market[,3],
-                market[,1],
-                FUN=function(m) t(m) %x% B,
-                simplify=FALSE)
-    return(X)
+    ## Second functional component, if available
+    if(!is.null(timeVec2)){
+        n_basis2 <- ifelse(is.null(n_basis2),n_basis,n_basis2)
+        basis2 <- ifelse(is.null(basis2),basis,basis2)
+        n_order2 <- ifelse(is.null(n_order2),n_order,n_order2)
+        t2 <- timeVec2
+        if(basis2=='B-Splines')
+            basisObj = create.bspline.basis(range(t2),
+                                            nbasis = n_basis2,
+                                            norder = n_order2)
+        if(basis=='Fourier'){
+            basisObj = create.fourier.basis(range(t2),
+                                            nbasis = n_basis2)
+        }
+        B2 = predict(basisObj, t2)
+        nc <- ncol(B)
+        BB2 <- cbind(B,B2)
+        B <- apply(BB2,1,function(x) x[c(1:nc)] %x% x[-c(1:nc)])
+        B <- t(B)
+        rm(BB2)
+    }
+    X <- cbind(marketLong[,-c(1:2)],B)
+    X <- apply(X,1,function(x) x[1:C]%x%x[-c(1:C)])
+    # X <- tapply(market$num,
+    #             market$group,
+    #             FUN=function(m) t(m) %x% B,
+    #             simplify=FALSE)
+    t(X)
 }
 
 #' Compute log-likelihood for aggregated model
