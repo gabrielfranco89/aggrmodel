@@ -61,47 +61,30 @@ buildX <- function(market,
 #'
 #'
 #' @param data Data Frame with 4 columns in the following order: Group, Replicates, Time, Signal
-#' @param muVecList List of \eqn{X\beta} for each group
+#' @param muVec Vector \eqn{X\beta} of fitted values
 #' @param covMtxList List of covariance matrices for each group
 #'
 #' @return Log-likehood value
-#' @import mvtnorm
+#' @importFrom mvtnorm dmvnorm
 #' @export
 logLikelihood <- function(data,
-                          muVecList,
+                          muVec,
                           covMtxList){
-
-    ## Preamble
-    require(mvtnorm, quietly=TRUE)
-
-    grps <- unique(data[,1])
-
-    ## Sort data to match time, group and replicates
-    ##    data <- data[order(data[,1], data[,2], data[,3]),]
-
-    sumLogLik <- 0
-    for(j in grps){
-
-        subData <- subset(data, data[,1]==j)
-
-        actualMu <- muVecList[[j]]
-        actualSigma <- as.matrix(covMtxList[[j]])
-
-
-        logLik <- tapply(subData$y, subData$rep,
-                         FUN=dmvnorm,
-                         mean = actualMu,
-                         sigma = actualSigma,
-                         log=TRUE)
-
-        sumLogLik <- sumLogLik + sum(logLik)
-
-    }
-
-
-    return(-sumLogLik)
-
-
+    data$flag <- as.factor(paste(data$rep,data$group))
+    data$flag <- as.integer(data$flag)
+    data$mu <- muVec
+    lk <- by(data = data,
+                INDICES = data$flag,
+                FUN = function(dt){
+                    jj <- dt$group[1]
+                    actualMu <- dt$mu
+                    actualSigma <- covMtxList[[jj]]
+                    mvtnorm::dmvnorm(x = dt$y,
+                                     mean = actualMu,
+                                     sigma = actualSigma,
+                                     log = TRUE)
+                })
+    -sum(unlist(lk))
 }
 
 
@@ -114,7 +97,7 @@ logLikelihood <- function(data,
 #' @param covWrap covariance structure
 #' @param corWrap correlation structure
 #' @param betaWrap beta parameter
-#' @param designListWrap list of design matrices for each group
+#' @param designWrap Design matrix
 #' @param nCons number of types of consumers
 #' @param nBasisCov number of basis functions for functional variance
 #' @param nOrderCov order of basis functions for functional variance
@@ -127,16 +110,17 @@ loglikWrapper <- function(pars,
                           covWrap,
                           corWrap,
                           betaWrap,
-                          designListWrap,
+                          designWrap,
                           nCons,
                           nBasisCov,
                           nOrderCov, ## for heterog model
                           verbWrap,
                           truncateDec = NULL
                           ){
-    muList <- lapply(designListWrap,
-                     function(x) as.matrix(x) %*% matrix(betaWrap,
-                                                         ncol=1))
+    mu <- designWrap %*% betaWrap
+        # lapply(designListWrap,
+        #              function(x) as.matrix(x) %*% matrix(betaWrap,
+        #                                                  ncol=1))
     if(covWrap == 'Homog_Uniform'){
         sigmaList <- covMatrix(market = mktWrap,
                                group.name = 'Group',
@@ -195,12 +179,12 @@ loglikWrapper <- function(pars,
         ## UNDER CONSTRUCTION -------------------->
     }
     lk <- logLikelihood(data = dataWrap,
-                        muVecList = muList,
+                        muVec = mu,
                         covMtxList = sigmaList
                         )
     if(is.infinite(lk))
         lk <- .Machine$double.xmax
-    
+
     if(all(verbWrap & covWrap=='Heterog'))
         message("\n lk =", round(lk,6),
                 "\n mean(betaPar) =", paste(round(apply(funcVarIn,2,mean),
@@ -215,7 +199,7 @@ loglikWrapper <- function(pars,
                 "\n pars =", paste(round(pars,2),
                                            collapse=',')
                 )
-        
+
     return(lk)
 }
 
