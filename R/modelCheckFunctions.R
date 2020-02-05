@@ -9,13 +9,18 @@
 #' @import ggplot2
 #' @export
 plot.aggrmodel <- function(object, scales = 'fixed'){
-    require(ggplot2)
     mcMtx <- object$mc
-    ## Plot
-    p <- ggplot(aes(x=time, y=mc), data=mcMtx) +
-        geom_line() +
-        facet_wrap(.~type, scales = scales)
-    p
+    if(ncol(mcMtx)==3){
+        p <- ggplot(aes(x=time, y=mc), data=mcMtx) +
+            geom_line() +
+            facet_wrap(.~type, scales = scales)
+        p
+    }else{
+      p <- ggplot(aes(x=time, y=mc, group=time2), data=mcMtx) +
+          geom_line(aes(col=time2)) +
+          facet_wrap(.~type, scales=scales)
+      p
+    }
 }
 
 #' Plot fitted values over observed values
@@ -28,12 +33,18 @@ plot.aggrmodel <- function(object, scales = 'fixed'){
 plotFitted <- function(object,
                        obsAlpha = .5,
                        predColor = 'magenta'){
-    require(ggplot2)
-    dd <- object#$fitted
+    dd <- object$fitted
+    if(ncol(dd)==5){
     p <- dd %>% ggplot(aes(x=time,y=y, group=rep)) +
         geom_line(alpha=obsAlpha) +
         geom_line(aes(y=pred), col=predColor) +
         facet_wrap(.~group)
+    }else{
+    p <- dd %>% ggplot(aes(x=time,y=y, group=rep)) +
+        geom_line(alpha=obsAlpha) +
+        geom_line(aes(y=pred,col=time2)) +
+        facet_wrap(.~group)
+    }
     p
 }
 
