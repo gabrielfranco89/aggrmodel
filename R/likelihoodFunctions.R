@@ -71,10 +71,6 @@ buildX <- function(marketLong,
     }
     X <- cbind(marketLong[,-c(1:2)],B)
     X <- apply(X,1,function(x) x[1:C]%x%x[-c(1:C)])
-    # X <- tapply(market$num,
-    #             market$group,
-    #             FUN=function(m) t(m) %x% B,
-    #             simplify=FALSE)
     t(X)
 }
 
@@ -141,9 +137,6 @@ loglikWrapper <- function(pars,
                           truncateDec = NULL
                           ){
     mu <- designWrap %*% betaWrap
-        # lapply(designListWrap,
-        #              function(x) as.matrix(x) %*% matrix(betaWrap,
-        #                                                  ncol=1))
     if(covWrap == 'Homog_Uniform'){
         sigmaList <- covMatrix(market = mktWrap,
                                group.name = 'Group',
@@ -199,7 +192,6 @@ loglikWrapper <- function(pars,
                                covType = 'Heterog',
                                corType = corWrap,
                                truncateDec = truncateDec)
-        ## UNDER CONSTRUCTION -------------------->
     }
     lk <- logLikelihood(data = dataWrap,
                         muVec = mu,
