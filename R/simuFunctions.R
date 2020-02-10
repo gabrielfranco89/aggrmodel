@@ -22,7 +22,7 @@ createSimuData <- function(B1 = 4,
                            B2 = 6,
                            nRep = 20,
                            market=NULL,
-                           market_range = 20:80,
+                           market_range = 5:25,
                            sigPar = c(2,2,2,4,4,4),
                            tauPar = c(.5,.5,.5, .4,.4,.4),
                            corPar = c(4,4,4,6,6,6),
@@ -47,7 +47,7 @@ createSimuData <- function(B1 = 4,
     }else{
         mkt <- market
     }# end if/else market is null
-    
+
     ## READ MEAN CURVES AND TEMPERATURES
     mc <- simulatedMeanCurves
     mc$Type <- rep(1:3,each=48)
@@ -70,23 +70,27 @@ createSimuData <- function(B1 = 4,
                      )
     dd <- merge(dd,mktMtx)
     dd <- cbind(dd, b)
-    dd$aggr <- dd$C1*dd$`1` +
-        dd$C2*dd$`2` +
-        dd$C3*dd$`3`
-    ## ADD TEMPERATURES
+    ## CREATE REPLICATES ----
     nr <- nrow(dd)
-    tmp <- do.call(rbind, replicate(n=nRep,
+    dd <- do.call(rbind, replicate(n=nRep,
                                    expr=dd,
                                    simplify=FALSE))
-    tmp$rep <- rep(1:nRep, each=nr)
-    temp$Time <- temp$Time/24
-    colnames(temp) <- c('time','rep','temp')
-    dd <- merge(tmp,temp)
-    rm(tmp)
+    dd$rep <- rep(1:nRep, each=nr)
+    tmp_x <- bs(seq(0,1, length.out=nrow(dd)/2),df = 5*J*nRep,intercept = TRUE)
+    tmp_bt1 <- rnorm(5*J*nRep,sd=2)
+    tmp_bt2 <- rnorm(5*J*nRep,sd=2)
+    dd$temp <- c(15+tmp_x %*% tmp_bt1, 24+tmp_x %*% tmp_bt2)
+    ## ADD TEMPERATURE EFFECT ----
+    dd$`1` <- dd$`1` * log(log(dd$temp))^tempPar
+    dd$`2` <- dd$`2` * log(log(dd$temp))^tempPar
+    dd$`3` <- dd$`3` * log(log(dd$temp))^tempPar
+    ## AGGREGATED DATA ----
+    dd$signal <- dd$C1*dd$`1` +
+        dd$C2*dd$`2` +
+        dd$C3*dd$`3`
     dd <- dd[order(dd$group,dd$rep,dd$time),]
     dd$cluster <- ifelse(dd$group %in% 1:B1, 1,2)
-    dd$signal <- dd$aggr*( log(log(dd$temp)) )^tempPar
-    ## COVARIANCE MATRICES FOR BOTH CLUSTES
+    ## COVARIANCE MATRICES FOR BOTH CLUSTES ----
     mkt1 <- mkt[1:(B1*C),]
     mkt2 <- mkt[-c(1:(B1*C)),]
     covMt1 <- covMatrix(market=mkt1,
@@ -129,19 +133,19 @@ createSimuData <- function(B1 = 4,
                                                Sigma=sigMtx)
                              })
                unlist(tmp)
-           })    
+           })
     obs <- unlist(obs)
     attr(obs,'names') <- NULL
     dd$obs <- obs
     ## ORGANIZE FOR OUTPUT
     dd$flag <- NULL
-    colnames(dd) <- c('time', 'rep','group',
+    colnames(dd) <- c('group', 'time',
                       'c1','c2','c3',
                       'mc1','mc2','mc3',
-                      'real_aggr',
+                      'rep',
                       'temperature',
+                      'signal',
                       'cluster',
-                      'signal_unnoisy',
                       'obs') ## the dependent variable
     attr(dd,"sigPar") = sigPar
     attr(dd,"corPar") = corPar
