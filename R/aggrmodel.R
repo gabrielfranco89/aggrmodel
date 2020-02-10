@@ -51,6 +51,7 @@ aggrmodel <- function(formula=NULL,
                       corType = 'periodic',
                       corPar_init = 20,
                       tauPar_init = .5,
+                      positive_restriction = FALSE,
                       optimMethod = "L-BFGS-B",
                       truncateDec = NULL,
                       verbose = FALSE,
@@ -142,6 +143,8 @@ aggrmodel <- function(formula=NULL,
                       )
     # X <- init$X
     beta_init <- init$beta
+    if(positive_restriction)
+        beta_init <- solve(t(X)%*%X) %*% (t(X)%*%log(y))
     parIn <- init$par
     lowerBoundVec <- init$lb
     upperBoundVec <- init$ub
@@ -153,6 +156,12 @@ aggrmodel <- function(formula=NULL,
     lkIn = Inf
     while(lkDiff > diffTol){
         ## W.1 Obtain covariance estimates via optim
+        if(positive_restriction){
+            parIn <- c(betaIn,parIn)
+            pLen <- length(parIn)
+            lowerBoundVec <- rep(-Inf, pLen)
+            upperBoundVec <- rep(Inf, pLen)
+        }
         opt <- optim(par = parIn,
                      fn = loglikWrapper,
                      covWrap = covType,
@@ -168,113 +177,125 @@ aggrmodel <- function(formula=NULL,
                      nBasisCov = n_basis_cov,
                      nOrderCov = n_order,
                      truncateDec = truncateDec,
+                     positive = positive_restriction,
                      verbWrap = verbose)
         parOut <- opt$par
         lkOut <- opt$value
 
         ## W.2 Update Sigma estimates
-        if(covType == 'Homog_Uniform'){
-            sigmaOutList <- covMatrix(market = market,
-                                      group.name = 'group',
-                                      type.name = 'type',
-                                      mkt.name = 'mkt',
-                                      timeVec = dd$time,
-                                      sigPar = parOut[1],
-                                      corPar = parOut[2],
-                                      covType = 'Homog_Uniform',
-                                      corType = corType,
-                                      truncateDec = truncateDec)
+        if(positive_restriction){
+            nCoef <- ncol(X)
+            betaOut <- parOut[c(1:nCoef)]
+            parOut <- parOut[-c(1:nCoef)]
+            if(covType == 'Homog_Uniform')
+                parOut[2] <- log(parOut[2])
+            if(covType == 'Homog')
+                parOut[(C+1):(2*C)] <- log(parOut[(C+1):(2*C)])
+            if(covType == 'Heterog'){
+                 parOut[(C*n_basis_cov+C+1):(length(parOut)-C)] <- log( parOut[(C*n_basis_cov+C+1):(length(parOut)-C)])
+                 parOut[((length(parOut)-C+1):length(parOut))] <- log( parOut[((length(parOut)-C+1):length(parOut))])
+            }
         }
-        if(covType == 'Homog'){
-            sigmaOutList <- covMatrix(market = market,
-                                      group.name = 'group',
-                                      type.name = 'type',
-                                      mkt.name = 'mkt',
-                                      timeVec = dd$time,
-                                      sigPar = parOut[1:C],
-                                      corPar = parOut[(C+1):(2*C)],
-                                      covType = 'Homog',
-                                      corType = corType,
-                                      truncateDec = truncateDec)
-        }
-        if(covType == 'Heterog'){
-            tvec <- unique(t)
-            basisObj = create.bspline.basis(range(tvec),
-                                            nbasis = n_basis_cov,
-                                            norder = n_order)
-            B <- predict(basisObj, tvec)
-            betaMC <- parOut[1:(C*n_basis_cov)]
-            betaMtx <- cbind(beta=as.matrix(betaMC),
-                             type=rep(1:C, each=n_basis_cov))
-            mcMtx <- tapply(betaMtx[,1],
-                            betaMtx[,2],
-                            function(x) B %*% x)
-            funcVarIn <- matrix(unlist(mcMtx), ncol = C)
-            sigParIn <- parOut[(C*n_basis_cov+1):(length(parOut)-(2*C))]
-            corParIn <- parOut[(C*n_basis_cov+C+1):(length(parOut)-C)]
-            tauParIn  <- parOut[((length(parOut)-C+1):length(parOut))]
-            sigmaOutList <- covMatrix(market = market,
-                                   group.name = 'group',
-                                   type.name = 'type',
-                                   mkt.name = 'mkt',
-                                   timeVec = dd$time,
-                                   funcMtx = funcVarIn,
-                                   sigPar = sigParIn,
-                                   corPar = corParIn,
-                                   tauPar = tauParIn,
-                                   covType = 'Heterog',
-                                   corType = corType,
-                                   truncateDec = truncateDec)
-        }
-
-
-        sigmaInvList <- lapply(sigmaOutList, qr.solve)
-
-        ## W.3 Obtain beta estimates with previous steps
-        sigmaInv <- lapply(sigmaInvList, function(x)
-            bdiag(replicate(n=I,
-                      expr=x,
-                      simplify=FALSE))
-            )
-        sigmaInv <- bdiag(sigmaInv)
-        betaLeft <- t(X)%*%sigmaInv%*%X
-        betaRight <- t(X)%*%sigmaInv%*%y
-        if(cicleRep){
-            ## Note: Here we use a(0) = a(T) restriction
-            if(basisFunction=='B-Splines')
-                basisObj = create.bspline.basis(range(t),
-                                                nbasis = n_basis,
+        if(!positive_restriction){
+            if(covType == 'Homog_Uniform'){
+                sigmaOutList <- covMatrix(market = market,
+                                          group.name = 'group',
+                                          type.name = 'type',
+                                          mkt.name = 'mkt',
+                                          timeVec = dd$time,
+                                          sigPar = parOut[1],
+                                          corPar = parOut[2],
+                                          covType = 'Homog_Uniform',
+                                          corType = corType,
+                                          truncateDec = truncateDec)
+            }
+            if(covType == 'Homog'){
+                sigmaOutList <- covMatrix(market = market,
+                                          group.name = 'group',
+                                          type.name = 'type',
+                                          mkt.name = 'mkt',
+                                          timeVec = dd$time,
+                                          sigPar = parOut[1:C],
+                                          corPar = parOut[(C+1):(2*C)],
+                                          covType = 'Homog',
+                                          corType = corType,
+                                          truncateDec = truncateDec)
+            }
+            if(covType == 'Heterog'){
+                tvec <- unique(t)
+                basisObj = create.bspline.basis(range(tvec),
+                                                nbasis = n_basis_cov,
                                                 norder = n_order)
-            if(basisFunction=='Fourier'){
-                basisObj = create.fourier.basis(range(t),
-                                                nbasis = n_basis)
+                B <- predict(basisObj, tvec)
+                betaMC <- parOut[1:(C*n_basis_cov)]
+                betaMtx <- cbind(beta=as.matrix(betaMC),
+                                 type=rep(1:C, each=n_basis_cov))
+                mcMtx <- tapply(betaMtx[,1],
+                                betaMtx[,2],
+                                function(x) B %*% x)
+                funcVarIn <- matrix(unlist(mcMtx), ncol = C)
+                sigParIn <- parOut[(C*n_basis_cov+1):(length(parOut)-(2*C))]
+                corParIn <- parOut[(C*n_basis_cov+C+1):(length(parOut)-C)]
+                tauParIn  <- parOut[((length(parOut)-C+1):length(parOut))]
+                sigmaOutList <- covMatrix(market = market,
+                                          group.name = 'group',
+                                          type.name = 'type',
+                                          mkt.name = 'mkt',
+                                          timeVec = dd$time,
+                                          funcMtx = funcVarIn,
+                                          sigPar = sigParIn,
+                                          corPar = corParIn,
+                                          tauPar = tauParIn,
+                                          covType = 'Heterog',
+                                          corType = corType,
+                                          truncateDec = truncateDec)
             }
-            B = predict(basisObj, t)
-            deltaVec <- matrix(B[1,] - B[nrow(B),],nrow=1)
-            ## Get lambdas
-            ## I can vectorize later (maybe)
-            m1List <- split(x=qr.solve(betaLeft),
-                            f=rep(1:C, each=n_basis))
-            m2List <- split(x=betaRight,
-                            f=rep(1:C, each=n_basis))
-            lambda <- matrix(numeric(C),nrow=1)
-            for(c in 1:C){
-                lUp <- deltaVec%*%
-                    matrix(m1List[[c]],
-                           nrow=n_basis)[,(n_basis*(c-1)+1):(c*n_basis)]%*%
-                    matrix(m2List[[c]],ncol=1)
-                lDown <- deltaVec%*%
-                    matrix(m1List[[c]],
-                           nrow=n_basis)[,(n_basis*(c-1)+1):(c*n_basis)]%*%
-                    t(deltaVec)
-                lambda[1,c] <- lUp/lDown
-            }
-            Rvec <- lambda %x% deltaVec
-            betaOut <- Matrix::solve(betaLeft, (betaRight - t(Rvec)))
-        } else {
-            betaOut <- Matrix::solve(betaLeft, betaRight)
-        } ## end if/else cicle
-
+            ## W.3 Obtain beta estimates with previous steps
+            sigmaInvList <- lapply(sigmaOutList, qr.solve)
+            sigmaInv <- lapply(sigmaInvList, function(x)
+                bdiag(replicate(n=I,
+                                expr=x,
+                                simplify=FALSE))
+            )
+            sigmaInv <- bdiag(sigmaInv)
+            betaLeft <- t(X)%*%sigmaInv%*%X
+            betaRight <- t(X)%*%sigmaInv%*%y
+            if(cicleRep){
+                ## Note: Here we use a(0) = a(T) restriction
+                if(basisFunction=='B-Splines')
+                    basisObj = create.bspline.basis(range(t),
+                                                    nbasis = n_basis,
+                                                    norder = n_order)
+                if(basisFunction=='Fourier'){
+                    basisObj = create.fourier.basis(range(t),
+                                                    nbasis = n_basis)
+                }
+                B = predict(basisObj, t)
+                deltaVec <- matrix(B[1,] - B[nrow(B),],nrow=1)
+                ## Get lambdas
+                ## I can vectorize later (maybe)
+                m1List <- split(x=qr.solve(betaLeft),
+                                f=rep(1:C, each=n_basis))
+                m2List <- split(x=betaRight,
+                                f=rep(1:C, each=n_basis))
+                lambda <- matrix(numeric(C),nrow=1)
+                for(c in 1:C){
+                    lUp <- deltaVec%*%
+                        matrix(m1List[[c]],
+                               nrow=n_basis)[,(n_basis*(c-1)+1):(c*n_basis)]%*%
+                        matrix(m2List[[c]],ncol=1)
+                    lDown <- deltaVec%*%
+                        matrix(m1List[[c]],
+                               nrow=n_basis)[,(n_basis*(c-1)+1):(c*n_basis)]%*%
+                        t(deltaVec)
+                    lambda[1,c] <- lUp/lDown
+                }
+                Rvec <- lambda %x% deltaVec
+                betaOut <- Matrix::solve(betaLeft, (betaRight - t(Rvec)))
+            } else {
+                betaOut <- Matrix::solve(betaLeft, betaRight)
+            } ## end if/else cicle
+        } ## end if !positive_restriction
         ## W.4 UPDATES
         lkDiff <- abs(lkOut - lkIn)
         betaIn <- as.numeric(betaOut)
