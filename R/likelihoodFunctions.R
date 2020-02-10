@@ -134,9 +134,16 @@ loglikWrapper <- function(pars,
                           nBasisCov,
                           nOrderCov, ## for heterog model
                           verbWrap,
+                          positive = FALSE,
                           truncateDec = NULL
                           ){
+    if(positive){
+        nCoef <- ncol(designWrap)
+        betaWrap <- pars[c(1:nCoef)]
+        pars <- pars[-c(1:nCoef)]
+    }
     mu <- designWrap %*% betaWrap
+    if(positive) mu <- exp(mu)
     if(covWrap == 'Homog_Uniform'){
         sigmaList <- covMatrix(market = mktWrap,
                                group.name = 'Group',
@@ -144,7 +151,7 @@ loglikWrapper <- function(pars,
                                mkt.name = 'mkt',
                                timeVec = dataWrap$time,
                                sigPar = pars[1],
-                               corPar = pars[2],
+                               corPar = ifelse(positive,exp(pars[2]),pars[2]),
                                covType = 'Homog_Uniform',
                                corType = corWrap,
                                truncateDec = truncateDec)
@@ -157,7 +164,9 @@ loglikWrapper <- function(pars,
                                mkt.name = 'mkt',
                                timeVec = dataWrap$time,
                                sigPar = pars[1:C],
-                               corPar = pars[(C+1):(2*C)],
+                               corPar = ifelse(positive,
+                                               exp(pars[(C+1):(2*C)]),
+                                               pars[(C+1):(2*C)]),
                                covType = 'Homog',
                                corType = corWrap,
                                truncateDec = truncateDec)
@@ -180,6 +189,10 @@ loglikWrapper <- function(pars,
         sigParIn <- pars[(C*nBasisCov+1):(length(pars)-(2*C))]
         corParIn <- pars[(C*nBasisCov+C+1):(length(pars)-C)]
         tauParIn  <- pars[((length(pars)-C+1):length(pars))]
+        if(positive){
+        corParIn <- exp(corParIn)
+        tauParIn <- exp(tauParIn)
+        }
         sigmaList <- covMatrix(market = mktWrap,
                                group.name = 'Group',
                                type.name = 'type',
@@ -214,7 +227,6 @@ loglikWrapper <- function(pars,
                 "\n pars =", paste(round(pars,2),
                                            collapse=',')
                 )
-
     return(lk)
 }
 
