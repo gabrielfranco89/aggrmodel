@@ -18,15 +18,16 @@
 #' @param corPar_init Numeric: Initial value for correlation parameters (default:20)
 #' @param tauPar_init Numeric: Initial value for expoent parameters of complete covariance (default:0.5)
 #' @param diffTol Tolerance of model covergence
+#' @param itMax Maximum number of iterations (Default: 100)
 #' @param verbose TRUE/FALSE prints likelihood values during optimization
 #'
 #' @return An aggrmodel object
 #' @examples
-#' df = subset(simuData, Cluster==1)
-#' mkt = subset(market, Cluster==1)
-#' mkt = subset(mkt, select=-Cluster)
+#' df = subset(simuData, cluster==1)
+#' mkt = attr(simuData, "market")
+#' mkt = subset(mkt, group %in% unique(df$group))
 #'
-#' aggrFit = aggrmodel(data = df, market = mkt, Y = Load, timeVar = Time, groupVar = Group, repVar = Rep, n_basis = 7)
+#' aggrFit = aggrmodel(data = df, market = mkt, Y = y, timeVar = time, groupVar = group, repVar = rep, n_basis = 7)
 #' @import Matrix
 #' @export
 
@@ -55,7 +56,8 @@ aggrmodel <- function(formula=NULL,
                       optimMethod = "L-BFGS-B",
                       truncateDec = NULL,
                       verbose = FALSE,
-                      diffTol = 1e-6){
+                      diffTol = 1e-6,
+                      itMax = 100){
 
 
     ## Checklist
@@ -154,7 +156,9 @@ aggrmodel <- function(formula=NULL,
     betaIn = beta_init
     lkDiff = diffTol + 1
     lkIn = Inf
-    while(lkDiff > diffTol){
+    itCount = 1
+    lkVec <- numeric(itMax)
+    while(lkDiff > diffTol & itCount < itMax){
         ## W.1 Obtain covariance estimates via optim
         if(positive_restriction){
             parIn <- c(betaIn,parIn)
@@ -178,9 +182,13 @@ aggrmodel <- function(formula=NULL,
                      nOrderCov = n_order,
                      truncateDec = truncateDec,
                      positive = positive_restriction,
-                     verbWrap = verbose)
+                     verbWrap = FALSE,
+                     hessian=TRUE)
         parOut <- opt$par
         lkOut <- opt$value
+        lkVec[itCount] <- lkOut
+        if(verbose)
+            message(paste("lk value:",lkOut))
 
         ## W.2 Update Sigma estimates
         if(positive_restriction){
@@ -301,9 +309,22 @@ aggrmodel <- function(formula=NULL,
         betaIn <- as.numeric(betaOut)
         parIn  <- parOut
         lkIn <- lkOut
+        itCount <- itCount + 1
+        if(itCount == itMax)
+            warning(paste("Loop stopped at max iteration count:",itMax))
     } ## End while(lkDiff > diffTol)
 
     ## Output ----------------------
+    ## Beta Std Error ----
+    sigmaum <- lapply(sigmaOutList, function(x)
+        bdiag(replicate(n=I,
+                        expr=x,
+                        simplify=FALSE))
+    )
+    sigmaum <- bdiag(sigmaum)
+    betaMult <- solve(t(X)%*%sigmaInv%*%X) %*% t(X)%*%sigmaInv
+    betaSE <- diag(sqrt(betaMult%*%sigmaum%*%t(betaMult)))
+    ## Mean curves ----
     if(is.null(timeVar2)){
         if(basisFunction=='B-Splines')
             basisObj = create.bspline.basis(range(t),
@@ -383,10 +404,13 @@ aggrmodel <- function(formula=NULL,
     ## Return
     outList <- list('beta' = as.matrix(betaOut),
                 'pars' = parOut,
+                'parsSE' = diag(sqrt(opt$hessian)),
                 'mc' = mcMtx,
                 'n_basis' = n_basis,
                 'n_order' = n_order,
-                'fitted' = dd)
+                'fitted' = dd,
+                'lkVec' = lkVec,
+                'betaSE' = betaSE)
     if(!is.null(formula))
         outList[['formula']] <- formula
     if(covType=='Heterog')

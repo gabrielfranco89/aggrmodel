@@ -158,15 +158,15 @@ loglikWrapper <- function(pars,
     }
     if(covWrap == 'Homog'){
         C <- length(unique(mktWrap[,2]))
+        cp <- pars[(C+1):(2*C)]
+        if(positive) cp <- exp(cp)
         sigmaList <- covMatrix(market = mktWrap,
                                group.name = 'Group',
                                type.name = 'type',
                                mkt.name = 'mkt',
                                timeVec = dataWrap$time,
                                sigPar = pars[1:C],
-                               corPar = ifelse(positive,
-                                               exp(pars[(C+1):(2*C)]),
-                                               pars[(C+1):(2*C)]),
+                               corPar = cp,
                                covType = 'Homog',
                                corType = corWrap,
                                truncateDec = truncateDec)
