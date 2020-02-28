@@ -17,6 +17,7 @@
 #' @param corType Correlation structure type. One of "periodic" or "exponential"
 #' @param corPar_init Numeric: Initial value for correlation parameters (default:20)
 #' @param tauPar_init Numeric: Initial value for expoent parameters of complete covariance (default:0.5)
+#' @param returnFitted Should the fitted values be returned in output?
 #' @param diffTol Tolerance of model covergence
 #' @param itMax Maximum number of iterations (Default: 100)
 #' @param verbose TRUE/FALSE prints likelihood values during optimization
@@ -408,9 +409,9 @@ aggrmodel <- function(formula=NULL,
                 'mc' = mcMtx,
                 'n_basis' = n_basis,
                 'n_order' = n_order,
-                'fitted' = dd,
                 'lkVec' = lkVec,
                 'betaSE' = betaSE)
+    if(returnFitted) outList[["fitted"]] <- dd
     if(!is.null(formula))
         outList[['formula']] <- formula
     if(covType=='Heterog')

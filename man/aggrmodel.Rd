@@ -72,6 +72,8 @@ aggrmodel(
 \item{diffTol}{Tolerance of model covergence}
 
 \item{itMax}{Maximum number of iterations (Default: 100)}
+
+\item{returnFitted}{Should the fitted values be returned in output?}
 }
 \value{
 An aggrmodel object
