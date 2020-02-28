@@ -8,8 +8,12 @@
 #' @param sigPar Parameters of sigma: vector of length 3
 #' @param tauPar Parameters of tau: vector of length 3
 #' @param corPar Parameters of correlation: vector of length 3
+#' @param nu1 Functional of variance for cluster 1 (must be of length N)
+#' @param nu2 Functional of variance for cluster 2 (must be of length N)
 #' @param seed Optional. Seed to be used for simulation
 #' @param tempPar Default:1. If you do not want temperature effect, set temPar=0
+#'
+#' @importFrom splines bs
 #'
 #' @return
 #' Return a data frame with nRep replicates and 3 types of consumer observed in 48 times. Parameters and market are returned as attributes.
@@ -26,6 +30,8 @@ createSimuData <- function(B1 = 4,
                            sigPar = c(2,2,2,4,4,4),
                            tauPar = c(.5,.5,.5, .4,.4,.4),
                            corPar = c(4,4,4,6,6,6),
+                           nu1 = NULL,
+                           nu2 = NULL,
                            seed=NULL,
                            tempPar=1
                            ){
@@ -76,7 +82,9 @@ createSimuData <- function(B1 = 4,
                                    expr=dd,
                                    simplify=FALSE))
     dd$rep <- rep(1:nRep, each=nr)
-    tmp_x <- bs(seq(0,1, length.out=nrow(dd)/2),df = 5*J*nRep,intercept = TRUE)
+    tmp_x <- splines::bs(seq(0,1, length.out=nrow(dd)/2),
+                         df = 5*J*nRep,
+                         intercept = TRUE)
     tmp_bt1 <- rnorm(5*J*nRep,sd=2)
     tmp_bt2 <- rnorm(5*J*nRep,sd=2)
     dd$temp <- c(15+tmp_x %*% tmp_bt1, 24+tmp_x %*% tmp_bt2)
@@ -91,6 +99,8 @@ createSimuData <- function(B1 = 4,
     dd <- dd[order(dd$group,dd$rep,dd$time),]
     dd$cluster <- ifelse(dd$group %in% 1:B1, 1,2)
     ## COVARIANCE MATRICES FOR BOTH CLUSTES ----
+    if(is.null(nu1)) nu1 <- b1
+    if(is.null(nu2)) nu2 <- b2
     mkt1 <- mkt[1:(B1*C),]
     mkt2 <- mkt[-c(1:(B1*C)),]
     covMt1 <- covMatrix(market=mkt1,
@@ -101,7 +111,7 @@ createSimuData <- function(B1 = 4,
                        sigPar=sigPar[,1],
                        tauPar=tauPar[,1],
                        corPar=corPar[,1],
-                       funcMtx=b1,
+                       funcMtx=nu1,
                        covType='Heterog',
                        truncateDec=8)
     covMt2 <- covMatrix(market=mkt2,
@@ -112,7 +122,7 @@ createSimuData <- function(B1 = 4,
                        sigPar=sigPar[,2],
                        tauPar=tauPar[,2],
                        corPar=corPar[,2],
-                       funcMtx=b2,
+                       funcMtx=nu2,
                        covType='Heterog',
                        truncateDec=8)
     ## CREATE NOISY DATA
