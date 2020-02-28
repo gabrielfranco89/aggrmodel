@@ -10,21 +10,28 @@ aggrmodel(
   market,
   Y = NULL,
   timeVar,
+  timeVar2 = NULL,
   groupVar,
   repVar,
   n_basis,
   n_basis_cov = NULL,
   basisFunction = "B-Splines",
+  timeVec2 = NULL,
+  n_basis2 = NULL,
+  n_order2 = NULL,
+  basisFunction2 = NULL,
   cicleRep = FALSE,
   n_order = 4,
   covType = "Homog_Uniform",
   corType = "periodic",
   corPar_init = 20,
   tauPar_init = 0.5,
+  positive_restriction = FALSE,
   optimMethod = "L-BFGS-B",
   truncateDec = NULL,
   verbose = FALSE,
-  diffTol = 1e-06
+  diffTol = 1e-06,
+  itMax = 100
 )
 }
 \arguments{
@@ -63,6 +70,8 @@ aggrmodel(
 \item{verbose}{TRUE/FALSE prints likelihood values during optimization}
 
 \item{diffTol}{Tolerance of model covergence}
+
+\item{itMax}{Maximum number of iterations (Default: 100)}
 }
 \value{
 An aggrmodel object
@@ -71,9 +80,9 @@ An aggrmodel object
 Fit Aggregated Model
 }
 \examples{
-df = subset(simuData, Cluster==1)
-mkt = subset(market, Cluster==1)
-mkt = subset(mkt, select=-Cluster)
+df = subset(simuData, cluster==1)
+mkt = attr(simuData, "market")
+mkt = subset(mkt, group \%in\% unique(df$group))
 
-aggrFit = aggrmodel(data = df, market = mkt, Y = Load, timeVar = Time, groupVar = Group, repVar = Rep, n_basis = 7)
+aggrFit = aggrmodel(data = df, market = mkt, Y = y, timeVar = time, groupVar = group, repVar = rep, n_basis = 7)
 }

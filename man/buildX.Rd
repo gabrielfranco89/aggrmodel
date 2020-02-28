@@ -4,9 +4,24 @@
 \alias{buildX}
 \title{Build design matrix to fit aggregated model}
 \usage{
-buildX(market, timeVec, n_basis, basis = "B-Splines", n_order = 4)
+buildX(
+  marketLong,
+  nType,
+  timeVec,
+  n_basis,
+  basis = "B-Splines",
+  n_order = 4,
+  timeVec2 = NULL,
+  n_basis2 = NULL,
+  basis2 = NULL,
+  n_order2 = NULL
+)
 }
 \arguments{
+\item{marketLong}{Market indexed by group and rep}
+
+\item{nType}{Number of subjects type}
+
 \item{timeVec}{Vector of sampled times}
 
 \item{n_basis}{Number of basis functions for basis expansion}
@@ -14,6 +29,14 @@ buildX(market, timeVec, n_basis, basis = "B-Splines", n_order = 4)
 \item{basis}{Character indicating which basis: 'B-Splines' or 'Fourier'}
 
 \item{n_order}{Order of basis splines (Default: 4)}
+
+\item{timeVec2}{Vector of second functional component}
+
+\item{n_basis2}{Number of basis function for timeVec2 expansion}
+
+\item{basis2}{Character indicating which basis: 'B-Splines' or 'Fourier'}
+
+\item{n_order2}{Order of B-Splines (Default:4)}
 }
 \value{
 List of basis matrices for each group in market[,1]

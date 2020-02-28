@@ -9,10 +9,12 @@ createSimuData(
   B2 = 6,
   nRep = 20,
   market = NULL,
-  market_range = 20:80,
+  market_range = 5:25,
   sigPar = c(2, 2, 2, 4, 4, 4),
   tauPar = c(0.5, 0.5, 0.5, 0.4, 0.4, 0.4),
   corPar = c(4, 4, 4, 6, 6, 6),
+  nu1 = NULL,
+  nu2 = NULL,
   seed = NULL,
   tempPar = 1
 )
@@ -33,6 +35,10 @@ createSimuData(
 \item{tauPar}{Parameters of tau: vector of length 3}
 
 \item{corPar}{Parameters of correlation: vector of length 3}
+
+\item{nu1}{Functional of variance for cluster 1 (must be of length N)}
+
+\item{nu2}{Functional of variance for cluster 2 (must be of length N)}
 
 \item{seed}{Optional. Seed to be used for simulation}
 

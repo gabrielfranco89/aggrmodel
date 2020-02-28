@@ -5,7 +5,7 @@
 \title{get_inits}
 \usage{
 get_inits(
-  XList,
+  X,
   I,
   y,
   C,
@@ -22,7 +22,7 @@ get_inits(
 )
 }
 \arguments{
-\item{XList}{Design matrix list}
+\item{X}{Design matrix}
 
 \item{I}{Number of replicates}
 

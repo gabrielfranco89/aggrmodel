@@ -16,6 +16,7 @@ loglikWrapper(
   nBasisCov,
   nOrderCov,
   verbWrap,
+  positive = FALSE,
   truncateDec = NULL
 )
 }
