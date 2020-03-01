@@ -1,6 +1,7 @@
 #' Fit Aggregated Model
 #'
 #' @name aggrmodel
+#'
 #' @param formula building...
 #' @param data Dataset containing group, replicates (if any), time and aggregated signal
 #' @param market Market data frame. MUST be a 3 column dataframe with the following order: Group, Type and Number of subjects
@@ -21,6 +22,15 @@
 #' @param diffTol Tolerance of model covergence
 #' @param itMax Maximum number of iterations (Default: 100)
 #' @param verbose TRUE/FALSE prints likelihood values during optimization
+#' @param timeVar2 Name of second functional
+#' @param n_basis2 Number of basis for second functional
+#' @param n_order2 Order for second functional expansion
+#' @param basisFunction2 Character indicating which basis: 'B-Splines' or 'Fourier'
+#' @param sigPar_init Inital values for sigma
+#' @param betaCov_init Inital values for variance functional expansion
+#' @param positive_restriction TRUE/FALSE if mean curves are strictly positive
+#' @param optimMethod Choose optim method (Default: L-BFGS-B)
+#' @param truncateDec Decimal to be truncated at covariance matrix
 #'
 #' @return An aggrmodel object
 #' @examples
@@ -43,7 +53,6 @@ aggrmodel <- function(formula=NULL,
                       n_basis,
                       n_basis_cov = NULL,
                       basisFunction = 'B-Splines',
-                      timeVec2 = NULL,
                       n_basis2 = NULL,
                       n_order2 = NULL,
                       basisFunction2 = NULL,
@@ -51,8 +60,10 @@ aggrmodel <- function(formula=NULL,
                       n_order = 4,
                       covType = 'Homog_Uniform',
                       corType = 'periodic',
+                      sigPar_init = NULL,
                       corPar_init = 20,
                       tauPar_init = .5,
+                      betaCov_init = NULL,
                       returnFitted = FALSE,
                       positive_restriction = FALSE,
                       optimMethod = "L-BFGS-B",
@@ -139,8 +150,10 @@ aggrmodel <- function(formula=NULL,
     init <- get_inits(X=X, I=I, y=y, C=C,
                       covType=covType,
                       market=market,
+                      sigPar_init=sigPar_init,
                       corPar_init=corPar_init,
                       tauPar_init=tauPar_init,
+                      betaCov_init=betaCov_init,
                       truncateDec=truncateDec,
                       n_basis=n_basis, n_basis_cov=n_basis_cov,
                       t=t, n_order=n_order, basisFunc=basisFunc
@@ -424,6 +437,7 @@ aggrmodel <- function(formula=NULL,
 ##' Aux function to get initial values in aggrmodel function
 ##'
 ##' @title get_inits
+##'
 ##' @param X Design matrix
 ##' @param I Number of replicates
 ##' @param y Dependent variable
@@ -437,13 +451,18 @@ aggrmodel <- function(formula=NULL,
 ##' @param n_basis_cov Number of basis function in heterogeneous case
 ##' @param t time vector
 ##' @param n_order Order of basis
+##' @param sigPar_init inital values for sigma parameter
+##' @param betaCov_init inital values for variance functional
 ##' @param basisFunc Basis function type
+##'
 ##' @return An object with initial values
 ##' @author Gabriel Franco
 get_inits <- function(X, I, y, C,
                       covType,
                        market,
+                      sigPar_init,
                        corPar_init, tauPar_init,
+                      betaCov_init,
                        truncateDec,
                        n_basis, n_basis_cov,
                        t, n_order, basisFunc
@@ -461,11 +480,11 @@ get_inits <- function(X, I, y, C,
     ddfit_init <- data.frame(y=y,X)
     fit_init <- lm(y~.-1, data = ddfit_init)
     beta_init <- coef(fit_init)
-    sigma_init <- sqrt(summary(fit_init)$sigma)
+    sigma_fit <- sqrt(summary(fit_init)$sigma)
     rm(ddfit_init)
 
     if(covType == 'Homog_Uniform'){
-        sigPar <- sigma_init
+        sigPar <- ifelse(is.null(sigPar_init), sigma_fit, sigPar_init)
         corPar <- corPar_init
         parIn <- c(sigPar, corPar)
         lowBoundVec <- c(-Inf, 1e-8)
@@ -474,7 +493,10 @@ get_inits <- function(X, I, y, C,
     }
 
     if(covType == 'Homog'){
-        sigPar <- rep(sigma_init,C)
+        if(is.null(sigPar_init))
+            sigPar <- rep(sigma_fit,C)
+        else
+            sigPar <- sigPar_init
         corPar <- rep(corPar_init, C)
         parIn <- c(sigPar, corPar)
         lowBoundVec <- c(rep(-Inf,C), rep(1e-20,C))
@@ -486,7 +508,7 @@ get_inits <- function(X, I, y, C,
         if(is.null(n_basis_cov)){
             warning("Using the same number of basis of model fit:",n_basis)
             n_basis_cov <- n_basis
-            betaCov_init <- beta_init
+            if(is.null(betaCov_init)){ betaCov_init <- beta_init}
         } else {
             ## fit new object for heterog.
             XListCov <- buildX(market=market,
@@ -505,10 +527,17 @@ get_inits <- function(X, I, y, C,
             Xcov <- cbind(dd, Xcov)
             Xcov <- Xcov[,-c(1:3)]
             fit_init_cov <- lm(y~.-1, data = Xcov)
-            betaCov_init <- coef(fit_init_cov)
+            if(is.null(betaCov_init))
+                betaCov_init <- coef(fit_init_cov)
+            else{
+                if(length(betaCov_init)!=n_basis_cov) stop("betaCov_init must have the same length as number of basis for covariance")
+            }
         } # end if/else
-        sigPar <- rep(sigma_init, C)/unlist(tapply(betaCov_init,
-                                                   rep(1:C, each=n_basis_cov),FUN=mean))
+        if(is.null(sigPar_init))
+            sigPar <- rep(sigma_fit, C)/unlist(tapply(betaCov_init,
+                                                      rep(1:C, each=n_basis_cov),FUN=mean))
+        else
+            sigPar <- sigPar_init
         corPar <- rep(corPar_init, C)
         tauPar <- rep(tauPar_init, C)
         parIn <- c(betaCov_init,sigPar, corPar, tauPar)

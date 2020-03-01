@@ -11,8 +11,10 @@ get_inits(
   C,
   covType,
   market,
+  sigPar_init,
   corPar_init,
   tauPar_init,
+  betaCov_init,
   truncateDec,
   n_basis,
   n_basis_cov,
@@ -34,9 +36,13 @@ get_inits(
 
 \item{market}{Model market}
 
+\item{sigPar_init}{inital values for sigma parameter}
+
 \item{corPar_init}{Initial value for correlation parameters}
 
 \item{tauPar_init}{Initial value for covariance parameter}
+
+\item{betaCov_init}{inital values for variance functional}
 
 \item{truncateDec}{Decimal to be truncated}
 

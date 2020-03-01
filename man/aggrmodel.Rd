@@ -16,7 +16,6 @@ aggrmodel(
   n_basis,
   n_basis_cov = NULL,
   basisFunction = "B-Splines",
-  timeVec2 = NULL,
   n_basis2 = NULL,
   n_order2 = NULL,
   basisFunction2 = NULL,
@@ -24,8 +23,11 @@ aggrmodel(
   n_order = 4,
   covType = "Homog_Uniform",
   corType = "periodic",
+  sigPar_init = NULL,
   corPar_init = 20,
   tauPar_init = 0.5,
+  betaCov_init = NULL,
+  returnFitted = FALSE,
   positive_restriction = FALSE,
   optimMethod = "L-BFGS-B",
   truncateDec = NULL,
@@ -45,6 +47,8 @@ aggrmodel(
 
 \item{timeVar}{Name of time variable}
 
+\item{timeVar2}{Name of second functional}
+
 \item{groupVar}{Name of grouping variable}
 
 \item{repVar}{Name of replicates variable}
@@ -55,6 +59,12 @@ aggrmodel(
 
 \item{basisFunction}{Character indicating which basis: 'B-Splines' or 'Fourier'}
 
+\item{n_basis2}{Number of basis for second functional}
+
+\item{n_order2}{Order for second functional expansion}
+
+\item{basisFunction2}{Character indicating which basis: 'B-Splines' or 'Fourier'}
+
 \item{cicleRep}{Indicator TRUE/FALSE if replicates are cyclical}
 
 \item{n_order}{Order of basis Splines (Default: 4)}
@@ -63,17 +73,27 @@ aggrmodel(
 
 \item{corType}{Correlation structure type. One of "periodic" or "exponential"}
 
+\item{sigPar_init}{Inital values for sigma}
+
 \item{corPar_init}{Numeric: Initial value for correlation parameters (default:20)}
 
 \item{tauPar_init}{Numeric: Initial value for expoent parameters of complete covariance (default:0.5)}
+
+\item{betaCov_init}{Inital values for variance functional expansion}
+
+\item{returnFitted}{Should the fitted values be returned in output?}
+
+\item{positive_restriction}{TRUE/FALSE if mean curves are strictly positive}
+
+\item{optimMethod}{Choose optim method (Default: L-BFGS-B)}
+
+\item{truncateDec}{Decimal to be truncated at covariance matrix}
 
 \item{verbose}{TRUE/FALSE prints likelihood values during optimization}
 
 \item{diffTol}{Tolerance of model covergence}
 
 \item{itMax}{Maximum number of iterations (Default: 100)}
-
-\item{returnFitted}{Should the fitted values be returned in output?}
 }
 \value{
 An aggrmodel object
