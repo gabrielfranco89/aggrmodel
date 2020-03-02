@@ -487,7 +487,7 @@ get_inits <- function(X, I, y, C,
         sigPar <- ifelse(is.null(sigPar_init), sigma_fit, sigPar_init)
         corPar <- corPar_init
         parIn <- c(sigPar, corPar)
-        lowBoundVec <- c(-Inf, 1e-8)
+        lowBoundVec <- c(1e-12, 1e-12)
         ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
         upperBoundVec <- c(Inf, ubCor)
     }
@@ -499,7 +499,7 @@ get_inits <- function(X, I, y, C,
             sigPar <- sigPar_init
         corPar <- rep(corPar_init, C)
         parIn <- c(sigPar, corPar)
-        lowBoundVec <- c(rep(-Inf,C), rep(1e-20,C))
+        lowBoundVec <- rep(1e-20,2*C)
         ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
         upperBoundVec <- c(rep(Inf,C), rep(ubCor,C))
     }
@@ -541,8 +541,8 @@ get_inits <- function(X, I, y, C,
         corPar <- rep(corPar_init, C)
         tauPar <- rep(tauPar_init, C)
         parIn <- c(betaCov_init,sigPar, corPar, tauPar)
-        lowBoundVec <- c(rep(-Inf,times=(C*n_basis_cov+C)),
-                         rep(0,2*C)) ## tau's > 0?
+        lowBoundVec <- c(rep(-Inf,times=(C*n_basis_cov)),
+                         rep(1e-20,3*C)) ## tau's > 0?
         ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
         upperBoundVec <- c(rep(Inf,times=(C*n_basis_cov+C)),
                          rep(ubCor,C), rep(Inf,C)) ## tau's > 0?
