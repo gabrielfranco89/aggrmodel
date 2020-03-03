@@ -538,8 +538,14 @@ get_inits <- function(X, I, y, C,
                                                       rep(1:C, each=n_basis_cov),FUN=mean))
         else
             sigPar <- sigPar_init
-        corPar <- rep(corPar_init, C)
-        tauPar <- rep(tauPar_init, C)
+        if(length(corPar_init)==1)
+          corPar <- rep(corPar_init, C)
+        else
+          corPar <- corPar_init
+        if(length(tauPar_init)==1)
+          tauPar <- rep(tauPar_init, C)
+        else
+          tauPar<- tauPar_init
         parIn <- c(betaCov_init,sigPar, corPar, tauPar)
         lowBoundVec <- c(rep(-Inf,times=(C*n_basis_cov)),
                          rep(1e-20,3*C)) ## tau's > 0?
