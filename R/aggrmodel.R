@@ -512,10 +512,11 @@ get_inits <- function(X, I, y, C,
         } else {
             ## fit new object for heterog.
             XListCov <- buildX(market=market,
-                            timeVec = t,
-                            n_basis = n_basis_cov,
-                            n_order = n_order,
-                            basis = basisFunction)
+                               nType = C,
+                               timeVec = t,
+                               n_basis = n_basis_cov,
+                               n_order = n_order,
+                               basis = basisFunction)
             Xcov <- lapply(XListCov,
                         function(x)
                             do.call(rbind,replicate(n=I,
