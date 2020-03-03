@@ -156,7 +156,7 @@ aggrmodel <- function(formula=NULL,
                       betaCov_init=betaCov_init,
                       truncateDec=truncateDec,
                       n_basis=n_basis, n_basis_cov=n_basis_cov,
-                      t=t, n_order=n_order, basisFunc=basisFunc
+                      t=t, n_order=n_order, basisFunc=basisFunction
                       )
     # X <- init$X
     beta_init <- init$beta
@@ -459,23 +459,14 @@ aggrmodel <- function(formula=NULL,
 ##' @author Gabriel Franco
 get_inits <- function(X, I, y, C,
                       covType,
-                       market,
+                      market,
                       sigPar_init,
-                       corPar_init, tauPar_init,
+                      corPar_init, tauPar_init,
                       betaCov_init,
-                       truncateDec,
-                       n_basis, n_basis_cov,
-                       t, n_order, basisFunc
-                       ){
-
-    # X <- lapply(XList,
-    #             function(x)
-    #                 do.call(rbind,replicate(n=I,
-    #                                         expr=x,
-    #                                         simplify=FALSE)
-    #                         )
-    #             )
-    # X <- do.call(rbind, X)
+                      truncateDec,
+                      n_basis, n_basis_cov,
+                      t, n_order, basisFunc
+){
     ## Get beta init -----------------------------
     ddfit_init <- data.frame(y=y,X)
     fit_init <- lm(y~.-1, data = ddfit_init)
@@ -511,12 +502,13 @@ get_inits <- function(X, I, y, C,
             if(is.null(betaCov_init)){ betaCov_init <- beta_init}
         } else {
             ## fit new object for heterog.
+            if(is.null(betaCov_init)){
             XListCov <- buildX(market=market,
                                nType = C,
                                timeVec = t,
                                n_basis = n_basis_cov,
                                n_order = n_order,
-                               basis = basisFunction)
+                               basis = basisFunc)
             Xcov <- lapply(XListCov,
                         function(x)
                             do.call(rbind,replicate(n=I,
@@ -525,13 +517,12 @@ get_inits <- function(X, I, y, C,
                                     )
                         )
             Xcov <- do.call(rbind, Xcov)
-            Xcov <- cbind(dd, Xcov)
-            Xcov <- Xcov[,-c(1:3)]
+            Xcov <- data.frame(y, Xcov)
             fit_init_cov <- lm(y~.-1, data = Xcov)
-            if(is.null(betaCov_init))
-                betaCov_init <- coef(fit_init_cov)
+            betaCov_init <- coef(fit_init_cov)
+            }
             else{
-                if(length(betaCov_init)!=n_basis_cov) stop("betaCov_init must have the same length as number of basis for covariance")
+                if(length(betaCov_init)!=C*n_basis_cov) stop("betaCov_init must have the same length as number of basis for covariance")
             }
         } # end if/else
         if(is.null(sigPar_init))
