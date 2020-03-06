@@ -180,12 +180,13 @@ loglikWrapper <- function(pars,
                                         norder = nOrderCov)
         B <- predict(basisObj, tvec)
         betaMC <- pars[1:(C*nBasisCov)]
-        betaMtx <- cbind(beta=as.matrix(betaMC),
-                         type=rep(1:C, each=nBasisCov))
-        mcMtx <- tapply(betaMtx[,1],
-                        betaMtx[,2],
-                        function(x) B %*% x)
-        funcVarIn <- matrix(unlist(mcMtx), ncol = C)
+        funcVarIn <- B %*% matrix(betaMC, ncol=3)
+        # betaMtx <- cbind(beta=as.matrix(betaMC),
+        #                  type=rep(1:C, each=nBasisCov))
+        # mcMtx <- tapply(betaMtx[,1],
+        #                 betaMtx[,2],
+        #                 function(x) B %*% x)
+        # funcVarIn <- matrix(unlist(mcMtx), ncol = C)
         sigParIn <- pars[(C*nBasisCov+1):(length(pars)-(2*C))]
         corParIn <- pars[(C*nBasisCov+C+1):(length(pars)-C)]
         tauParIn  <- pars[((length(pars)-C+1):length(pars))]
