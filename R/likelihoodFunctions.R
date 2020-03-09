@@ -69,9 +69,14 @@ buildX <- function(marketLong,
         B <- t(B)
         rm(BB2)
     }
-    X <- cbind(marketLong[,-c(1:2)],B)
-    X <- apply(X,1,function(x) x[1:C]%x%x[-c(1:C)])
-    t(X)
+    tmp <- list()
+    for(c in 1:C){
+        tmp[[c]] <- marketLong[,1+c]*B
+    }
+    do.call(cbind,tmp)
+    # X <- cbind(marketLong[,-c(1:2)],B)
+    #X <- apply(X,1,function(x) x[1:C]%x%x[-c(1:C)])
+    #t(X)
 }
 
 #' Compute log-likelihood for aggregated model
