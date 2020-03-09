@@ -187,14 +187,6 @@ covMatrix <- function(market,
     C = length(unique(myMkt$type))
     J = length(unique(myMkt$group))
 
-    mktComp <- myMkt  %>%
-        spread(key = type,
-               value = num) %>%
-    ##    select(-group) %>%
-    ##    as.matrix() %>%
-    ##    split(1:J)
-        split(.$group) %>%
-        map(function(x) x %>% select(-group) %>% as.matrix())
 
     ## Homog Unif ::::::::::::::::::::::::::::::
     if(covType == 'Homog_Uniform'){
@@ -241,6 +233,11 @@ covMatrix <- function(market,
 
          covMtxListC[[c]] <- vc %*% cc %*% vc
      }
+     mktComp <- myMkt  %>%
+         spread(key = type,
+                value = num) %>%
+         split(.$group) %>%
+         map(function(x) x %>% select(-group) %>% as.matrix())
      covMtxList = lapply(mktComp,
                          function(mj){
                              mm <- matrix(0,
@@ -291,6 +288,11 @@ covMatrix <- function(market,
                    funcVecIn = funcMtx,
                    trc = truncateDec,
                    t=t) # end lapply
+        mktComp <- myMkt  %>%
+            spread(key = type,
+                   value = num) %>%
+            split(.$group) %>%
+            map(function(x) x %>% select(-group) %>% as.matrix())
         covMtxList = lapply(mktComp,
                      function(mj, cMtx, C){
                          mm = lapply(1:C,
