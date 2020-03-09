@@ -34,16 +34,17 @@ This is a basic example which shows you how to solve a common problem:
 ```{r example, eval=FALSE}
 library(aggrmodel)
 
-df = subset(simuData, Cluster==1)
-mkt = subset(market, Cluster==1)
-mkt = subset(mkt, select=-Cluster)
+df = simuData
+mkt = attr(df, "market")
+df = subset(df, cluster==1)
+mkt = subset(mkt, group %in% unique(df$group))
 
 aggrFit = aggrmodel(data = df,        ## Your data
                     market = mkt,     ## Data market
-                    Y = Load,         ## Dep. variable
-                    timeVar = Time,   ## Time variable
-                    groupVar = Group, ## Group variable
-                    repVar = Rep,     ## Replicate variable
+                    Y = y,         ## Dep. variable
+                    timeVar =time,   ## Time variable
+                    groupVar = group, ## Group variable
+                    repVar = rep,     ## Replicate variable
                     n_basis = 7)      ## Number of basis functions
 
 ```
