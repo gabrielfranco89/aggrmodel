@@ -102,8 +102,9 @@ An aggrmodel object
 Fit Aggregated Model
 }
 \examples{
-df = subset(simuData, cluster==1)
-mkt = attr(simuData, "market")
+df = simuData
+mkt = attr(df, "market")
+df = subset(df, cluster==1)
 mkt = subset(mkt, group \%in\% unique(df$group))
 
 aggrFit = aggrmodel(data = df, market = mkt, Y = y, timeVar = time, groupVar = group, repVar = rep, n_basis = 7)

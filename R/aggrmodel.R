@@ -34,8 +34,9 @@
 #'
 #' @return An aggrmodel object
 #' @examples
-#' df = subset(simuData, cluster==1)
-#' mkt = attr(simuData, "market")
+#' df = simuData
+#' mkt = attr(df, "market")
+#' df = subset(df, cluster==1)
 #' mkt = subset(mkt, group %in% unique(df$group))
 #'
 #' aggrFit = aggrmodel(data = df, market = mkt, Y = y, timeVar = time, groupVar = group, repVar = rep, n_basis = 7)
@@ -109,8 +110,8 @@ aggrmodel <- function(formula=NULL,
                                       levels=levels(grps)))
     ## Build disagragation basis expansion design matrix
     mktLong <- spread(market,type,num)
-    groupnrep <- subset(dd, select=c(group,rep))
-    mktLong <- merge(groupnrep,mktLong)
+    groupList <- subset(dd, select=c(group))
+    mktLong <- merge(groupList,mktLong)
     X <- buildX(market=mktLong,
                     nType = C,
                     timeVec = t,
@@ -419,7 +420,7 @@ aggrmodel <- function(formula=NULL,
     ## Return
     outList <- list('beta' = as.matrix(betaOut),
                 'pars' = parOut,
-                'parsSE' = diag(sqrt(opt$hessian)),
+                'parsSE' = sqrt(diag(opt$hessian)),
                 'mc' = mcMtx,
                 'n_basis' = n_basis,
                 'n_order' = n_order,
