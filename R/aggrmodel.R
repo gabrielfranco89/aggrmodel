@@ -36,10 +36,10 @@
 #' @examples
 #' df = simuData
 #' mkt = attr(df, "market")
-#' df = subset(df, cluster==1)
+#' df = subset(df, cluster==2)
 #' mkt = subset(mkt, group %in% unique(df$group))
 #'
-#' aggrFit = aggrmodel(data = df, market = mkt, Y = y, timeVar = time, groupVar = group, repVar = rep, n_basis = 7)
+#' aggrFit = aggrmodel(data = df, market = mkt, Y = y, timeVar = time, groupVar = group, corType = 'exponential',repVar = rep, n_basis = 7)
 #' @import Matrix
 #' @export
 
@@ -63,7 +63,7 @@ aggrmodel <- function(formula=NULL,
                       corType = 'periodic',
                       sigPar_init = NULL,
                       corPar_init = 20,
-                      tauPar_init = .5,
+                      tauPar_init = 1,
                       betaCov_init = NULL,
                       returnFitted = FALSE,
                       positive_restriction = FALSE,
@@ -109,7 +109,7 @@ aggrmodel <- function(formula=NULL,
     market$group <- as.integer(factor(market$group,
                                       levels=levels(grps)))
     ## Build disagragation basis expansion design matrix
-    mktLong <- spread(market,type,num)
+    mktLong <- tidyr::spread(market,type,num)
     groupList <- subset(dd, select=c(group))
     mktLong <- merge(groupList,mktLong)
     X <- buildX(market=mktLong,
@@ -148,9 +148,12 @@ aggrmodel <- function(formula=NULL,
         rm(cvrtMtx)
     } ## end if is.null(formula)
     ## Get initial values -------------------------------------
-    init <- get_inits(X=X, I=I, y=y, C=C,
+    init <- get_inits(X=X, I=I,
+                      data = dd,
+                      #y=y,
+                      C=C,
                       covType=covType,
-                      market=market,
+                      market=mktLong,
                       sigPar_init=sigPar_init,
                       corPar_init=corPar_init,
                       tauPar_init=tauPar_init,
@@ -182,6 +185,19 @@ aggrmodel <- function(formula=NULL,
             lowerBoundVec <- rep(-Inf, pLen)
             upperBoundVec <- rep(Inf, pLen)
         }
+        dd$resid <- dd$y - as.numeric(X %*% betaIn)
+        residList <- by(dd, INDICES = dd$group,FUN = function(x){
+            by(x, x$rep, function(d){
+                rr <- matrix(d$resid, ncol=1)
+                rr %*% t(rr)
+            })
+        })
+        residListGroup <- lapply(residList, function(x){
+            nRep <- length(x)
+            Reduce("+",x) / (nRep - 1)
+        }
+        )
+        rm(residList)
         opt <- optim(par = parIn,
                      fn = loglikWrapper,
                      covWrap = covType,
@@ -189,6 +205,7 @@ aggrmodel <- function(formula=NULL,
                      dataWrap = dd,
                      mktWrap = market,
                      betaWrap = betaIn,
+                     sCovWrap = residListGroup,
                      designWrap = X,
                      nCons = C,
                      lower = lowerBoundVec,
@@ -198,7 +215,7 @@ aggrmodel <- function(formula=NULL,
                      nOrderCov = n_order,
                      truncateDec = truncateDec,
                      positive = positive_restriction,
-                     verbWrap = FALSE,
+                     verbWrap = TRUE,
                      hessian=TRUE)
         parOut <- opt$par
         lkOut <- opt$value
@@ -458,7 +475,7 @@ aggrmodel <- function(formula=NULL,
 ##'
 ##' @return An object with initial values
 ##' @author Gabriel Franco
-get_inits <- function(X, I, y, C,
+get_inits <- function(X, I, data, C,
                       covType,
                       market,
                       sigPar_init,
@@ -469,6 +486,7 @@ get_inits <- function(X, I, y, C,
                       t, n_order, basisFunc
 ){
     ## Get beta init -----------------------------
+    y <- data$y
     ddfit_init <- data.frame(y=y,X)
     fit_init <- lm(y~.-1, data = ddfit_init)
     beta_init <- coef(fit_init)
@@ -500,51 +518,76 @@ get_inits <- function(X, I, y, C,
         if(is.null(n_basis_cov)){
             warning("Using the same number of basis of model fit:",n_basis)
             n_basis_cov <- n_basis
-            if(is.null(betaCov_init)){ betaCov_init <- beta_init}
-        } else {
-            ## fit new object for heterog.
-            if(is.null(betaCov_init)){
-            XListCov <- buildX(market=market,
-                               nType = C,
-                               timeVec = t,
-                               n_basis = n_basis_cov,
-                               n_order = n_order,
-                               basis = basisFunc)
-            Xcov <- lapply(XListCov,
-                        function(x)
-                            do.call(rbind,replicate(n=I,
-                                                    expr=x,
-                                                    simplify=FALSE)
-                                    )
-                        )
-            Xcov <- do.call(rbind, Xcov)
-            Xcov <- data.frame(y, Xcov)
-            fit_init_cov <- lm(y~.-1, data = Xcov)
-            betaCov_init <- coef(fit_init_cov)
+        }
+        if(is.null(betaCov_init)){
+        ## fit new object for heterog ----
+            data$resid <- resid(fit_init)
+            sCovDiag <- by(data, INDICES = data$group,FUN = function(x){
+                by(x, x$rep, function(y){
+                    rr <- matrix(y$resid, ncol=1)
+                    rr %*% t(rr)
+                })
+            })
+            sCovDiag <- lapply(sCovDiag, function(x){
+                nRep <- length(x)
+                out <- Reduce("+",x) / (nRep -1)
+                diag(out)
             }
-            else{
-                if(length(betaCov_init)!=C*n_basis_cov) stop("betaCov_init must have the same length as number of basis for covariance")
-            }
+            )
+            sCovDiag <- lapply(sCovDiag, function(x) do.call(c, replicate(n=I, x, simplify = FALSE)))
+            sCovDiag <- unlist(sCovDiag)
+            Xcov <- buildX(market=market,
+                           nType = C,
+                           timeVec = t,
+                           n_basis = n_basis_cov,
+                           n_order = n_order,
+                           basis = basisFunc)
+            # Xcov <- lapply(XListCov,
+            #             function(x)
+            #                 do.call(rbind,replicate(n=I,
+            #                                         expr=x,
+            #                                         simplify=FALSE)
+            #                         )
+            #             )
+            # Xcov <- do.call(rbind, Xcov)
+            Xcov <- data.frame(sVar = sCovDiag, Xcov)
+            fit_init_cov <- lm(sVar~.-1, data = Xcov)
+            beta1 <- coef(fit_init_cov)
+            bObj <- fda::create.bspline.basis(0:1,nbasis = n_basis_cov,
+                                              norder = n_order,
+                                              basis = basisFunc)
+            bMtx <- predict(bObj, unique(data$time))
+            nu_hat <- Matrix::bdiag(replicate(n=C,bMtx,simplify = FALSE)) %*% beta1
+            nu_hat <- matrix(sqrt(nu_hat), ncol = C)
+            betaCov_init <- apply(nu_hat,2,function(nn){
+                dd_tmp <- data.frame(y=nn, bMtx)
+                coef(lm(y~.-1, data =dd_tmp))
+            })
+            betaCov_init <- c(betaCov_init)
+        }
+        else{
+            if(length(betaCov_init)!=C*n_basis_cov) stop("betaCov_init must have the same length as number of basis for covariance")
         } # end if/else
         if(is.null(sigPar_init))
-            sigPar <- rep(sigma_fit, C)/unlist(tapply(betaCov_init,
-                                                      rep(1:C, each=n_basis_cov),FUN=mean))
+            sigPar <- rep(1,C)
+            # sigPar <- rep(sigma_fit, C)/unlist(tapply(betaCov_init,
+            #                                           rep(1:C, each=n_basis_cov),FUN=mean))
         else
             sigPar <- sigPar_init
         if(length(corPar_init)==1)
-          corPar <- rep(corPar_init, C)
+            corPar <- rep(corPar_init, C)
         else
-          corPar <- corPar_init
+            corPar <- corPar_init
         if(length(tauPar_init)==1)
-          tauPar <- rep(tauPar_init, C)
+            tauPar <- rep(tauPar_init, C)
         else
-          tauPar<- tauPar_init
+            tauPar<- tauPar_init
         parIn <- c(betaCov_init,sigPar, corPar, tauPar)
         lowBoundVec <- c(rep(-Inf,times=(C*n_basis_cov)),
                          rep(1e-20,3*C)) ## tau's > 0?
         ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
         upperBoundVec <- c(rep(Inf,times=(C*n_basis_cov+C)),
-                         rep(ubCor,C), rep(Inf,C)) ## tau's > 0?
+                           rep(ubCor,C), rep(Inf,C)) ## tau's > 0?
     }# end if heterog
 
     output <- list()
