@@ -487,9 +487,16 @@ get_inits <- function(X, I, y, C,
     if(covType == 'Homog'){
         if(is.null(sigPar_init))
             sigPar <- rep(sigma_fit,C)
-        else
+        else{
+          if(length(sigPar_init)!=C) stop("sigPar_init must have length equal",C)
             sigPar <- sigPar_init
-        corPar <- rep(corPar_init, C)
+        }
+        if(is.null(corPar_init))
+          corPar <- rep(1,C)
+        else{
+          if(length(corPar_init)!=C) stop("corPar_init must gave length equal",C)
+          corPar <- corPar_init
+        }
         parIn <- c(sigPar, corPar)
         lowBoundVec <- rep(1e-20,2*C)
         ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
