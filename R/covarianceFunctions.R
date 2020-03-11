@@ -77,7 +77,7 @@ periodicCorMtx <- function(timeVec,
 expCorMtx <- function(timeVec, corPar,
                       truncateDec = NULL){
     baseMtx <- createCorBase(timeVec)
-    mtx <- exp(-2*abs(baseMtx)*corPar)
+    mtx <- exp(-2*abs(baseMtx)*(1/corPar))
     if(!is.null(truncateDec)) mtx <- round(mtx,truncateDec)
     return(mtx)
 }

@@ -8,13 +8,15 @@
 #' @return ggplot plot object
 #' @import ggplot2
 #' @export
-plot.aggrmodel <- function(object, scales = 'fixed'){
+plot.aggrmodel <- function(object, scales = 'fixed', IC = TRUE){
     mcMtx <- object$mc
-    if(ncol(mcMtx)==3){
-        p <- ggplot(aes(x=time, y=mc), data=mcMtx) +
-            geom_line() +
-            facet_wrap(.~type, scales = scales)
-        p
+    if(is.null(mcMtx$time2)){
+      p <- ggplot(aes(x=time, y=mc), data=mcMtx) +
+        geom_line()
+      if(IC) p <- p +
+          geom_line(aes(x=time, y=mc_lwr), linetype=2, alpha = .4)+
+          geom_line(aes(x=time, y=mc_upr), linetype=2, alpha = .4)
+      p + facet_wrap(.~type, scales = scales)
     }else{
       p <- ggplot(aes(x=time, y=mc, group=time2), data=mcMtx) +
           geom_line(aes(col=time2)) +
@@ -34,7 +36,7 @@ plotFitted <- function(object,
                        obsAlpha = .5,
                        predColor = 'magenta'){
     dd <- object$fitted
-    if(ncol(dd)==5){
+    if(ncol(dd)==6){
     p <- dd %>% ggplot(aes(x=time,y=y, group=rep)) +
         geom_line(alpha=obsAlpha) +
         geom_line(aes(y=pred), col=predColor) +

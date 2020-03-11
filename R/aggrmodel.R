@@ -70,6 +70,8 @@ aggrmodel <- function(formula=NULL,
                       optimMethod = "L-BFGS-B",
                       truncateDec = NULL,
                       verbose = FALSE,
+                      optVerbose = FALSE,
+                      useGrad = FALSE,
                       diffTol = 1e-6,
                       itMax = 100){
 
@@ -177,6 +179,7 @@ aggrmodel <- function(formula=NULL,
     lkIn = Inf
     itCount = 1
     lkVec <- numeric(itMax)
+    if(!useGrad) gradLK <- NULL
     while(lkDiff > diffTol & itCount < itMax){
         ## W.1 Obtain covariance estimates via optim
         if(positive_restriction){
@@ -200,6 +203,7 @@ aggrmodel <- function(formula=NULL,
         rm(residList)
         opt <- optim(par = parIn,
                      fn = loglikWrapper,
+                     gr = gradLK,
                      covWrap = covType,
                      corWrap = corType,
                      dataWrap = dd,
@@ -215,13 +219,12 @@ aggrmodel <- function(formula=NULL,
                      nOrderCov = n_order,
                      truncateDec = truncateDec,
                      positive = positive_restriction,
-                     verbWrap = TRUE,
+                     verbWrap = optVerbose,
                      hessian=TRUE)
         parOut <- opt$par
         lkOut <- opt$value
-        lkVec[itCount] <- lkOut
         if(verbose)
-            message(paste("lk value:",lkOut))
+            message(paste("Norm value:",lkOut))
 
         ## W.2 Update Sigma estimates
         if(positive_restriction){
@@ -273,7 +276,7 @@ aggrmodel <- function(formula=NULL,
                                  type=rep(1:C, each=n_basis_cov))
                 mcMtx <- tapply(betaMtx[,1],
                                 betaMtx[,2],
-                                function(x) B %*% x)
+                                function(x) exp(B %*% x))
                 funcVarIn <- matrix(unlist(mcMtx), ncol = C)
                 sigParIn <- parOut[(C*n_basis_cov+1):(length(parOut)-(2*C))]
                 corParIn <- parOut[(C*n_basis_cov+C+1):(length(parOut)-C)]
@@ -342,6 +345,10 @@ aggrmodel <- function(formula=NULL,
         betaIn <- as.numeric(betaOut)
         parIn  <- parOut
         lkIn <- lkOut
+        lkVec[itCount] <- logLikelihood(data = dd,
+                                        muVec = X %*% betaIn,
+                                        covMtxList = sigmaOutList
+        )
         itCount <- itCount + 1
         if(itCount == itMax)
             warning(paste("Loop stopped at max iteration count:",itMax))
@@ -369,14 +376,19 @@ aggrmodel <- function(formula=NULL,
         }
         tuni <- unique(t)
         B = predict(basisObj, tuni)
+        B <- Matrix::bdiag(replicate(n=C,B,simplify = FALSE))
         ## Separate betas
         betaMC <- betaOut[1:(C*n_basis)]
-        betaMtx <- cbind(beta=as.matrix(betaMC),
-                         type=rep(1:C, each=n_basis))
-        mcMtx <- tapply(betaMtx[,1],
-                        betaMtx[,2],
-                        function(x) B %*% x)
-        mcMtx <- data.frame(mc=unlist(mcMtx),
+        betaLwr <- betaMC - qnorm(.975)*betaSE
+        betaUpr <- betaMC + qnorm(.975)*betaSE
+        # betaMtx <- cbind(beta=as.matrix(betaMC),
+        #                  type=rep(1:C, each=n_basis))
+        # mcMtx <- tapply(betaMtx[,1],
+        #                 betaMtx[,2],
+        #                 function(x) B %*% x)
+        mcMtx <- data.frame(mc= as.numeric(B %*% betaMC),# unlist(mcMtx),
+                            mc_lwr = as.numeric(B %*% betaLwr),
+                            mc_upr = as.numeric(B %*% betaUpr),
                             time=rep(tuni,times=C),
                             type=rep(unique(market[,2]), each=length(tuni)))
     }
@@ -550,20 +562,21 @@ get_inits <- function(X, I, data, C,
             #                         )
             #             )
             # Xcov <- do.call(rbind, Xcov)
-            Xcov <- data.frame(sVar = sCovDiag, Xcov)
+            Xcov <- data.frame(sVar = log(sCovDiag), Xcov)
             fit_init_cov <- lm(sVar~.-1, data = Xcov)
             beta1 <- coef(fit_init_cov)
-            bObj <- fda::create.bspline.basis(0:1,nbasis = n_basis_cov,
-                                              norder = n_order,
-                                              basis = basisFunc)
-            bMtx <- predict(bObj, unique(data$time))
-            nu_hat <- Matrix::bdiag(replicate(n=C,bMtx,simplify = FALSE)) %*% beta1
-            nu_hat <- matrix(sqrt(nu_hat), ncol = C)
-            betaCov_init <- apply(nu_hat,2,function(nn){
-                dd_tmp <- data.frame(y=nn, bMtx)
-                coef(lm(y~.-1, data =dd_tmp))
-            })
-            betaCov_init <- c(betaCov_init)
+            # bObj <- fda::create.bspline.basis(0:1,nbasis = n_basis_cov,
+            #                                   norder = n_order,
+            #                                   basis = basisFunc)
+            # bMtx <- predict(bObj, unique(data$time))
+            # nu_hat <- Matrix::bdiag(replicate(n=C,bMtx,simplify = FALSE)) %*% beta1
+            # nu_hat <- matrix(sqrt(nu_hat), ncol = C)
+            # betaCov_init <- apply(nu_hat,2,function(nn){
+            #     dd_tmp <- data.frame(y=nn, bMtx)
+            #     coef(lm(y~.-1, data =dd_tmp))
+            # })
+            # betaCov_init <- c(betaCov_init)
+            betaCov_init <- beta1
         }
         else{
             if(length(betaCov_init)!=C*n_basis_cov) stop("betaCov_init must have the same length as number of basis for covariance")
@@ -583,8 +596,9 @@ get_inits <- function(X, I, data, C,
         else
             tauPar<- tauPar_init
         parIn <- c(betaCov_init,sigPar, corPar, tauPar)
-        lowBoundVec <- c(rep(-Inf,times=(C*n_basis_cov)),
-                         rep(1e-20,3*C)) ## tau's > 0?
+        lowBoundVec <- c(rep(-Inf,times=(C*n_basis_cov)), ##beta
+                         rep(1e-20,2*C), ## sigPar & corPar
+                         rep(0,C)) ## tauPar
         ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
         upperBoundVec <- c(rep(Inf,times=(C*n_basis_cov+C)),
                            rep(ubCor,C), rep(Inf,C)) ## tau's > 0?
