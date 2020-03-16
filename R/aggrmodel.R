@@ -65,7 +65,7 @@ aggrmodel <- function(formula=NULL,
                       corPar_init = 20,
                       tauPar_init = 1,
                       betaCov_init = NULL,
-                      returnFitted = FALSE,
+                      returnFitted = TRUE,
                       positive_restriction = FALSE,
                       optimMethod = "L-BFGS-B",
                       truncateDec = NULL,
@@ -107,6 +107,7 @@ aggrmodel <- function(formula=NULL,
     if(!is.null(timeVar2)) dd$time2 <- t2
     dd <- dd[order(dd$group, dd$rep, dd$time),]
     y <- dd$y
+    t <- dd$time
     colnames(market) <- c("group","type","num")
     market$group <- as.integer(factor(market$group,
                                       levels=levels(grps)))
@@ -116,7 +117,7 @@ aggrmodel <- function(formula=NULL,
     mktLong <- merge(groupList,mktLong)
     X <- buildX(market=mktLong,
                     nType = C,
-                    timeVec = t,
+                    timeVec = dd$time,
                     n_basis = n_basis,
                     n_order = n_order,
                     basis = basisFunction,
@@ -125,29 +126,31 @@ aggrmodel <- function(formula=NULL,
                     n_order2 = n_order2,
                     basis2 = basisFunction2)
     if(!is.null(formula)){
-        cvrtMtx <- as.data.frame(model.matrix(formula, data = data))
-        cvrtMtx <- cbind(cvrtMtx,
+        cvtMtx <- as.data.frame(model.matrix(formula, data = data))
+        cvtMtx <- cbind(cvtMtx,
                          group=grps,
                          rep=reps,
-                         time=t
+                         time=dd$time
                          )
-        cvrtMtx <- cvrtMtx[order(cvrtMtx[['rep']],
-                                 cvrtMtx[['group']],
-                                 cvrtMtx[['time']]),]
+        cvtMtx <- cvtMtx[order(cvtMtx[['rep']],
+                                 cvtMtx[['group']],
+                                 cvtMtx[['time']]),]
+        X <- cbind(X,subset(cvtMtx,
+                            select=-c(rep,group,time)))
+        X <- as.matrix(X)
         ## same for all replicates
-        cvrtMtx <- subset(cvrtMtx,
-                          rep == unique(reps)[1])
-        cvrtMtx <- split(cvrtMtx, f=cvrtMtx$group)
-        for(j in names(XList)){
-            XList[[j]] <- cbind(as.data.frame(XList[[j]]),
-                                cvrtMtx[[j]]
-                                )
-            XList[[j]] <-as.matrix(
-                subset(XList[[j]],
-                       select=-c(rep, group, time))
-            )
-        }
-        rm(cvrtMtx)
+        # cvtMtx <- subset(cvtMtx,
+        #                   rep == unique(reps)[1])
+        # cvtMtx <- split(cvtMtx, f=cvtMtx$group)
+        # for(j in names(XList)){
+        #     XList[[j]] <- cbind(as.data.frame(XList[[j]]),
+        #                         cvtMtx[[j]]
+        #                         )
+        #     XList[[j]] <-as.matrix(
+        #         subset(XList[[j]],
+        #                select=-c(rep, group, time))
+        #     )
+        # }
     } ## end if is.null(formula)
     ## Get initial values -------------------------------------
     init <- get_inits(X=X, I=I,
@@ -363,7 +366,7 @@ aggrmodel <- function(formula=NULL,
     )
     sigmaum <- bdiag(sigmaum)
     betaMult <- solve(t(X)%*%sigmaInv%*%X) %*% t(X)%*%sigmaInv
-    betaSE <- diag(sqrt(betaMult%*%sigmaum%*%t(betaMult)))
+    betaSE <- sqrt(diag(betaMult%*%sigmaum%*%t(betaMult)))
     ## Mean curves ----
     if(is.null(timeVar2)){
         if(basisFunction=='B-Splines')
@@ -379,8 +382,9 @@ aggrmodel <- function(formula=NULL,
         B <- Matrix::bdiag(replicate(n=C,B,simplify = FALSE))
         ## Separate betas
         betaMC <- betaOut[1:(C*n_basis)]
-        betaLwr <- betaMC - qnorm(.975)*betaSE
-        betaUpr <- betaMC + qnorm(.975)*betaSE
+        betaMC_SE <- betaSE[1:(C*n_basis)]
+        betaLwr <- betaMC - qnorm(.975)*betaMC_SE
+        betaUpr <- betaMC + qnorm(.975)*betaMC_SE
         # betaMtx <- cbind(beta=as.matrix(betaMC),
         #                  type=rep(1:C, each=n_basis))
         # mcMtx <- tapply(betaMtx[,1],
@@ -509,7 +513,7 @@ get_inits <- function(X, I, data, C,
         sigPar <- ifelse(is.null(sigPar_init), sigma_fit, sigPar_init)
         corPar <- corPar_init
         parIn <- c(sigPar, corPar)
-        lowBoundVec <- c(1e-12, 1e-12)
+        lowBoundVec <- c(1e-4, 1e-4)
         ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
         upperBoundVec <- c(Inf, ubCor)
     }
@@ -521,7 +525,7 @@ get_inits <- function(X, I, data, C,
             sigPar <- sigPar_init
         corPar <- rep(corPar_init, C)
         parIn <- c(sigPar, corPar)
-        lowBoundVec <- rep(1e-20,2*C)
+        lowBoundVec <- rep(1e-4,2*C)
         ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
         upperBoundVec <- c(rep(Inf,C), rep(ubCor,C))
     }
@@ -597,7 +601,7 @@ get_inits <- function(X, I, data, C,
             tauPar<- tauPar_init
         parIn <- c(betaCov_init,sigPar, corPar, tauPar)
         lowBoundVec <- c(rep(-Inf,times=(C*n_basis_cov)), ##beta
-                         rep(1e-20,2*C), ## sigPar & corPar
+                         rep(1e-4,2*C), ## sigPar & corPar
                          rep(0,C)) ## tauPar
         ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
         upperBoundVec <- c(rep(Inf,times=(C*n_basis_cov+C)),

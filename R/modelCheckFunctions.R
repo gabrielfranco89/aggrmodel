@@ -36,7 +36,7 @@ plotFitted <- function(object,
                        obsAlpha = .5,
                        predColor = 'magenta'){
     dd <- object$fitted
-    if(ncol(dd)==6){
+    if(is.null(object$mc$time2)){
     p <- dd %>% ggplot(aes(x=time,y=y, group=rep)) +
         geom_line(alpha=obsAlpha) +
         geom_line(aes(y=pred), col=predColor) +
