@@ -126,7 +126,11 @@ logLikelihood <- function(data,
 #' @param nBasisCov number of basis functions for functional variance
 #' @param nOrderCov order of basis functions for functional variance
 #' @param verbWrap TRUE/FALSE prints likelihood values during optimization
+#' @param sCovWrap Sample covariance matrix
+#' @param optWrap Optmization criterion should be via sample cov. matrix (TRUE) or via likelihood (more sensitive)
+#' @param positive Use positive restriction?
 #' @param truncateDec Integer: Decimal to be truncated in exponential functional
+#'
 #' @export
 loglikWrapper <- function(pars,
                           dataWrap,
@@ -136,6 +140,7 @@ loglikWrapper <- function(pars,
                           corWrap,
                           betaWrap,
                           designWrap,
+                          optWrap = TRUE,
                           nCons,
                           nBasisCov,
                           nOrderCov, ## for heterog model
@@ -209,101 +214,72 @@ loglikWrapper <- function(pars,
                                corType = corWrap,
                                truncateDec = truncateDec)
     }
-# Compute diff between sample cov and model cov ------
-    diffList <- purrr::map2(sigmaList, sCovWrap, `-`)
-    diffList <- lapply(diffList, abs)
-    normFrob <- lapply(diffList, norm, type = "F")
- #   normFrob <- lapply(normFrob, function(x) x^2)
-    normFrob <- sqrt(Reduce("+", normFrob))
-#    if(verbWrap) message("norm =", normFrob)
-    if(all(verbWrap & covWrap=='Heterog'))
-        message("\n norm =", round(normFrob,6),
-                "\n mean(betaPar) =", paste(round(betaMC,4),collapse=','),
-                "\n sigPar =", paste(round(sigParIn,4), collapse=','),
-                "\n corPar =", paste(round(corParIn,4), collapse=','),
-                "\n tauPar =", paste(round(tauParIn,4), collapse=',')
-                )
-    if(all(verbWrap & !covWrap=='Heterog'))
-        message("\n lk =", round(normFrob,6),
-                "\n pars =", paste(pars,
-                                   collapse=',')
-        )
-
-
-
-
-
-    if(is.nan(normFrob)){
-                # message("\n norm =", round(normFrob,6),
-                # "\n mean(betaPar) =", paste(round(c(betaMC),4), collapse=','),
-                # "\n sigPar =", paste(round(sigParIn,4), collapse=','),
-                # "\n corPar =", paste(round(corParIn,4), collapse=','),
-                # "\n tauPar =", paste(round(tauParIn,4), collapse=',')
-                # )
-        message(str(sigmaList))
-        message(str(sCovWrap))
-        message( str(diffList))
-        message(str(lapply(diffList, summary)))
-        message(str(lapply(diffList, norm, type = "F")))
-        myList <- list("sigmaList"=sigmaList,
-                       "sCovWrap"=sCovWrap,
-                       "diffList"=diffList,
-                       "pars" = pars,
-                       "mktWrap" = mktWrap)#,
-                #       "funcMtx" = funcVarIn,
-#                       "sigPar" = sigParIn,
-#                       "corPar" = corParIn,
- #                      "tauPar" = tauParIn)
-        save(myList, file = "/tmp/myList.RData")
+    if(optWrap){
+        # Compute diff between sample cov and model cov ------
+        diffList <- purrr::map2(sigmaList, sCovWrap, `-`)
+        diffList <- lapply(diffList, abs)
+        normFrob <- lapply(diffList, norm, type = "F")
+        normFrob <- sqrt(Reduce("+", normFrob))
+        if(all(verbWrap & covWrap=='Heterog'))
+            message("\n norm =", round(normFrob,6),
+                    "\n mean(betaPar) =", paste(round(betaMC,4),collapse=','),
+                    "\n sigPar =", paste(round(sigParIn,4), collapse=','),
+                    "\n corPar =", paste(round(corParIn,4), collapse=','),
+                    "\n tauPar =", paste(round(tauParIn,4), collapse=',')
+            )
+        if(all(verbWrap & !covWrap=='Heterog'))
+            message("\n lk =", round(normFrob,6),
+                    "\n pars =", paste(pars,
+                                       collapse=',')
+            )
+        return(log(normFrob))
     }
+    else{
+        ## Loglik ----
+        lk <- logLikelihood(data = dataWrap,
+                            muVec = mu,
+                            covMtxList = sigmaList
+        )
+        if(is.infinite(lk))
+            lk <- .Machine$double.xmax
 
-    log(normFrob)
-#    else
-
-    # ## Loglik ----
-    # lk <- logLikelihood(data = dataWrap,
-    #                     muVec = mu,
-    #                     covMtxList = sigmaList
-    #                     )
-    # if(is.infinite(lk))
-    #     lk <- .Machine$double.xmax
-    #
-    # if(all(verbWrap & covWrap=='Heterog'))
-    #     message("\n lk =", round(lk,6),
-    #             "\n mean(betaPar) =", paste(round(apply(funcVarIn,2,mean),
-    #                                            4),
-    #                                      collapse=','),
-    #             "\n mean(sigPar) =", paste(round(sigParIn,4), collapse=','),
-    #             "\n corPar =", paste(round(corParIn,4), collapse=','),
-    #             "\n tauPar =", paste(round(tauParIn,4), collapse=',')
-    #             )
-    #     if(all(verbWrap & !covWrap=='Heterog'))
-    #     message("\n lk =", round(lk,6),
-    #             "\n pars =", paste(round(pars,2),
-    #                                        collapse=',')
-    #             )
-    # return(lk)
+        if(all(verbWrap & covWrap=='Heterog'))
+            message("\n lk =", round(lk,6),
+                    "\n mean(betaPar) =", paste(round(apply(funcVarIn,2,mean),
+                                                      4),
+                                                collapse=','),
+                    "\n mean(sigPar) =", paste(round(sigParIn,4), collapse=','),
+                    "\n corPar =", paste(round(corParIn,4), collapse=','),
+                    "\n tauPar =", paste(round(tauParIn,4), collapse=',')
+            )
+        if(all(verbWrap & !covWrap=='Heterog'))
+            message("\n lk =", round(lk,6),
+                    "\n pars =", paste(round(pars,2),
+                                       collapse=',')
+            )
+        return(lk)
+    }
 }
 
-#' Title
+#' Create gradient function approximation via PRACMA package
 #'
-#' @param x
-#' @param dataWrap
-#' @param mktWrap
-#' @param sCovWrap
-#' @param covWrap
-#' @param corWrap
-#' @param betaWrap
-#' @param designWrap
-#' @param nCons
-#' @param nBasisCov
-#' @param nOrderCov
-#' @param verbWrap
-#' @param positive
-#' @param truncateDec
+#'
+#' @param x parameters to be evaluated
+#' @param dataWrap dataset
+#' @param mktWrap market dataset
+#' @param covWrap covariance structure
+#' @param corWrap correlation structure
+#' @param betaWrap beta parameter
+#' @param designWrap Design matrix
+#' @param nCons number of types of consumers
+#' @param nBasisCov number of basis functions for functional variance
+#' @param nOrderCov order of basis functions for functional variance
+#' @param verbWrap TRUE/FALSE prints likelihood values during optimization
+#' @param sCovWrap Sample covariance matrix
+#' @param positive Use positive restriction?
+#' @param truncateDec Integer: Decimal to be truncated in exponential functional
 #'
 #' @return
-#' @export
 #' @importFrom pracma grad
 #'
 #' @examples

@@ -7,7 +7,7 @@
 get_inits(
   X,
   I,
-  y,
+  data,
   C,
   covType,
   market,
@@ -27,8 +27,6 @@ get_inits(
 \item{X}{Design matrix}
 
 \item{I}{Number of replicates}
-
-\item{y}{Dependent variable}
 
 \item{C}{Number of subject types}
 
@@ -55,6 +53,8 @@ get_inits(
 \item{n_order}{Order of basis}
 
 \item{basisFunc}{Basis function type}
+
+\item{y}{Dependent variable}
 }
 \value{
 An object with initial values

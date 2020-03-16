@@ -31,6 +31,9 @@
 #' @param positive_restriction TRUE/FALSE if mean curves are strictly positive
 #' @param optimMethod Choose optim method (Default: L-BFGS-B)
 #' @param truncateDec Decimal to be truncated at covariance matrix
+#' @param optSampleCovMatrix Optmization criterion via sample covariance matrix convergence (TRUE and default) or via likelihood (more sensitive)
+#' @param optVerbose Print parameters while in optmization
+#' @param useGrad Use gradient function approximation for optimization? (Default: FALSE)
 #'
 #' @return An aggrmodel object
 #' @examples
@@ -61,6 +64,7 @@ aggrmodel <- function(formula=NULL,
                       n_order = 4,
                       covType = 'Homog_Uniform',
                       corType = 'periodic',
+                      optSampleCovMatrix = TRUE,
                       sigPar_init = NULL,
                       corPar_init = 20,
                       tauPar_init = 1,
@@ -138,19 +142,6 @@ aggrmodel <- function(formula=NULL,
         X <- cbind(X,subset(cvtMtx,
                             select=-c(rep,group,time)))
         X <- as.matrix(X)
-        ## same for all replicates
-        # cvtMtx <- subset(cvtMtx,
-        #                   rep == unique(reps)[1])
-        # cvtMtx <- split(cvtMtx, f=cvtMtx$group)
-        # for(j in names(XList)){
-        #     XList[[j]] <- cbind(as.data.frame(XList[[j]]),
-        #                         cvtMtx[[j]]
-        #                         )
-        #     XList[[j]] <-as.matrix(
-        #         subset(XList[[j]],
-        #                select=-c(rep, group, time))
-        #     )
-        # }
     } ## end if is.null(formula)
     ## Get initial values -------------------------------------
     init <- get_inits(X=X, I=I,
@@ -167,7 +158,6 @@ aggrmodel <- function(formula=NULL,
                       n_basis=n_basis, n_basis_cov=n_basis_cov,
                       t=t, n_order=n_order, basisFunc=basisFunction
                       )
-    # X <- init$X
     beta_init <- init$beta
     if(positive_restriction)
         beta_init <- solve(t(X)%*%X) %*% (t(X)%*%log(y))
@@ -181,7 +171,7 @@ aggrmodel <- function(formula=NULL,
     lkDiff = diffTol + 1
     lkIn = Inf
     itCount = 1
-    lkVec <- numeric(itMax)
+    lkVec = normVec = numeric(itMax)
     if(!useGrad) gradLK <- NULL
     while(lkDiff > diffTol & itCount < itMax){
         ## W.1 Obtain covariance estimates via optim
@@ -214,6 +204,7 @@ aggrmodel <- function(formula=NULL,
                      betaWrap = betaIn,
                      sCovWrap = residListGroup,
                      designWrap = X,
+                     optWrap = optSampleCovMatrix,
                      nCons = C,
                      lower = lowerBoundVec,
                      upper = upperBoundVec,
@@ -225,11 +216,8 @@ aggrmodel <- function(formula=NULL,
                      verbWrap = optVerbose,
                      hessian=TRUE)
         parOut <- opt$par
-        normOut <- opt$value
-        if(verbose)
-            message(paste("Norm value:",normOut))
 
-        ## W.2 Update Sigma estimates
+        ## W.2 Update Sigma estimates ----
         if(positive_restriction){
             nCoef <- ncol(X)
             betaOut <- parOut[c(1:nCoef)]
@@ -343,15 +331,25 @@ aggrmodel <- function(formula=NULL,
                 betaOut <- Matrix::solve(betaLeft, betaRight)
             } ## end if/else cicle
         } ## end if !positive_restriction
-        ## W.4 UPDATES
+        ## W.4 UPDATES ----
         betaIn <- as.numeric(betaOut)
         parIn  <- parOut
-        lkOut <- logLikelihood(data = dd,
-                                        muVec = X %*% betaIn,
-                                        covMtxList = sigmaOutList
-                )
-        if(verbose) message("lk value: ",lkOut)
-        lkVec[itCount] <- lkOut
+        if(optSampleCovMatrix){
+            lkValue <- logLikelihood(data = dd,
+                                   muVec = X %*% betaIn,
+                                   covMtxList = sigmaOutList
+            )
+            normVec[itCount] <- opt$value
+        }
+        else{
+            lkValue <- opt$value
+        }
+        lkOut <- opt$value
+        if(verbose){
+            if(optSampleCovMatrix) message("norm value: ",lkOut)
+            else message("lk value: ",lkOut)
+        }
+        lkVec[itCount] <- lkValue
         lkDiff <- abs(lkOut - lkIn)
         lkIn <- lkOut
         itCount <- itCount + 1
@@ -387,11 +385,6 @@ aggrmodel <- function(formula=NULL,
         betaMC_SE <- betaSE[1:(C*n_basis)]
         betaLwr <- betaMC - qnorm(.975)*betaMC_SE
         betaUpr <- betaMC + qnorm(.975)*betaMC_SE
-        # betaMtx <- cbind(beta=as.matrix(betaMC),
-        #                  type=rep(1:C, each=n_basis))
-        # mcMtx <- tapply(betaMtx[,1],
-        #                 betaMtx[,2],
-        #                 function(x) B %*% x)
         mcMtx <- data.frame(mc= as.numeric(B %*% betaMC),# unlist(mcMtx),
                             mc_lwr = as.numeric(B %*% betaLwr),
                             mc_upr = as.numeric(B %*% betaUpr),
@@ -452,7 +445,7 @@ aggrmodel <- function(formula=NULL,
     levels(dd$group) <- levels(grps)
     dd$rep <- as.factor(dd$rep)
     levels(dd$rep) <- levels(reps)
-    ## Return
+    ## Return ----
     outList <- list('beta' = as.matrix(betaOut),
                 'pars' = parOut,
                 'parsSE' = sqrt(diag(opt$hessian)),
@@ -462,6 +455,7 @@ aggrmodel <- function(formula=NULL,
                 'lkVec' = lkVec,
                 'betaSE' = betaSE)
     if(returnFitted) outList[["fitted"]] <- dd
+    if(optSampleCovMatrix) outList[["normValues"]] <- normVec
     if(!is.null(formula))
         outList[['formula']] <- formula
     if(covType=='Heterog')

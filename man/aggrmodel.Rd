@@ -23,15 +23,18 @@ aggrmodel(
   n_order = 4,
   covType = "Homog_Uniform",
   corType = "periodic",
+  optSampleCovMatrix = TRUE,
   sigPar_init = NULL,
   corPar_init = 20,
-  tauPar_init = 0.5,
+  tauPar_init = 1,
   betaCov_init = NULL,
-  returnFitted = FALSE,
+  returnFitted = TRUE,
   positive_restriction = FALSE,
   optimMethod = "L-BFGS-B",
   truncateDec = NULL,
   verbose = FALSE,
+  optVerbose = FALSE,
+  useGrad = FALSE,
   diffTol = 1e-06,
   itMax = 100
 )
@@ -73,6 +76,8 @@ aggrmodel(
 
 \item{corType}{Correlation structure type. One of "periodic" or "exponential"}
 
+\item{optSampleCovMatrix}{Optmization criterion via sample covariance matrix convergence (TRUE and default) or via likelihood (more sensitive)}
+
 \item{sigPar_init}{Inital values for sigma}
 
 \item{corPar_init}{Numeric: Initial value for correlation parameters (default:20)}
@@ -91,6 +96,10 @@ aggrmodel(
 
 \item{verbose}{TRUE/FALSE prints likelihood values during optimization}
 
+\item{optVerbose}{Print parameters while in optmization}
+
+\item{useGrad}{Use gradient function approximation for optimization? (Default: FALSE)}
+
 \item{diffTol}{Tolerance of model covergence}
 
 \item{itMax}{Maximum number of iterations (Default: 100)}
@@ -104,8 +113,8 @@ Fit Aggregated Model
 \examples{
 df = simuData
 mkt = attr(df, "market")
-df = subset(df, cluster==1)
+df = subset(df, cluster==2)
 mkt = subset(mkt, group \%in\% unique(df$group))
 
-aggrFit = aggrmodel(data = df, market = mkt, Y = y, timeVar = time, groupVar = group, repVar = rep, n_basis = 7)
+aggrFit = aggrmodel(data = df, market = mkt, Y = y, timeVar = time, groupVar = group, corType = 'exponential',repVar = rep, n_basis = 7)
 }
