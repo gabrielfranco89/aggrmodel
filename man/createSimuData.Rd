@@ -15,6 +15,10 @@ createSimuData(
   corPar = c(4, 4, 4, 6, 6, 6),
   nu1 = NULL,
   nu2 = NULL,
+  tmp_bt1 = NULL,
+  tmp_bt2 = NULL,
+  beta1 = 0,
+  beta2 = 0,
   seed = NULL,
   tempPar = 1
 )
@@ -39,6 +43,10 @@ createSimuData(
 \item{nu1}{Functional of variance for cluster 1 (must be of length N)}
 
 \item{nu2}{Functional of variance for cluster 2 (must be of length N)}
+
+\item{tmp_bt1}{Beta parameters for winter temperature simulation. Must be of size  5*J*nRep. If NULL,  rnorm(5*J*nRep,sd=2) will be used}
+
+\item{tmp_bt2}{Beta parameters for summer temperature simulation. Must be of size  5*J*nRep. If NULL,  rnorm(5*J*nRep,sd=2) will be used}
 
 \item{seed}{Optional. Seed to be used for simulation}
 

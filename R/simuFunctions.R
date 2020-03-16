@@ -1,5 +1,6 @@
 #' Simulate aggregated data
 #' @name createSimuData
+#'
 #' @param B1 Number of groups from cluster 1
 #' @param B2 Number of groups from cluster 2
 #' @param nRep Number of replicates
@@ -12,6 +13,8 @@
 #' @param nu2 Functional of variance for cluster 2 (must be of length N)
 #' @param seed Optional. Seed to be used for simulation
 #' @param tempPar Default:1. If you do not want temperature effect, set temPar=0
+#' @param tmp_bt1 Beta parameters for winter temperature simulation. Must be of size  5*J*nRep. If NULL,  rnorm(5*J*nRep,sd=2) will be used
+#' @param tmp_bt2 Beta parameters for summer temperature simulation. Must be of size  5*J*nRep. If NULL,  rnorm(5*J*nRep,sd=2) will be used
 #'
 #' @importFrom splines bs
 #'
@@ -32,6 +35,10 @@ createSimuData <- function(B1 = 4,
                            corPar = c(4,4,4,6,6,6),
                            nu1 = NULL,
                            nu2 = NULL,
+                           tmp_bt1 = NULL,
+                           tmp_bt2 = NULL,
+                           beta1 = 0,
+                           beta2 = 0,
                            seed=NULL,
                            tempPar=1
                            ){
@@ -58,7 +65,6 @@ createSimuData <- function(B1 = 4,
     mc <- simulatedMeanCurves
     mc$Type <- rep(1:3,each=48)
     mc$Time2 <- mc$Time/24
-    temp <- simuTemperature
     ## Create base dataset
     mktMtx <- matrix(mkt[,3], nrow=J, byrow=TRUE)
     colnames(mktMtx) <- paste('C',1:C,sep='')
@@ -82,20 +88,30 @@ createSimuData <- function(B1 = 4,
                                    expr=dd,
                                    simplify=FALSE))
     dd$rep <- rep(1:nRep, each=nr)
-    tmp_x <- splines::bs(seq(0,1, length.out=nrow(dd)/2),
-                         df = 5*J*nRep,
-                         intercept = TRUE)
-    tmp_bt1 <- rnorm(5*J*nRep,sd=2)
-    tmp_bt2 <- rnorm(5*J*nRep,sd=2)
-    dd$temp <- c(15+tmp_x %*% tmp_bt1, 24+tmp_x %*% tmp_bt2)
+    if(tempPar != 0){
+        tmp_x <- splines::bs(seq(0,1, length.out=nrow(dd)/2),
+                             df = 5*J*nRep,
+                             intercept = TRUE)
+        if(is.null(tmp_bt1)) tmp_bt1 <- rnorm(5*J*nRep,sd=2)
+        if(is.null(tmp_bt2)) tmp_bt2 <- rnorm(5*J*nRep,sd=2)
+        dd$temp <- c(15+tmp_x %*% tmp_bt1, 24+tmp_x %*% tmp_bt2)
+    }
+    else
+        dd$temp <- 10L
     ## ADD TEMPERATURE EFFECT ----
     dd$`1` <- dd$`1` * log(log(dd$temp))^tempPar
     dd$`2` <- dd$`2` * log(log(dd$temp))^tempPar
     dd$`3` <- dd$`3` * log(log(dd$temp))^tempPar
+    ## ADD DUMMY VAR
+    ##   added only on cluster 2
+    dd$dummy1 <- ifelse(dd$group %in%  (B1+1):(B1+2),1,0)
+    dd$dummy2 <- ifelse(dd$group == J, 1, 0)
     ## AGGREGATED DATA ----
     dd$signal <- dd$C1*dd$`1` +
         dd$C2*dd$`2` +
-        dd$C3*dd$`3`
+        dd$C3*dd$`3` +
+        beta1*dd$dummy1 +
+        beta2*dd$dummy2
     dd <- dd[order(dd$group,dd$rep,dd$time),]
     dd$cluster <- ifelse(dd$group %in% 1:B1, 1,2)
     ## COVARIANCE MATRICES FOR BOTH CLUSTES ----
@@ -154,6 +170,8 @@ createSimuData <- function(B1 = 4,
                       'mc1','mc2','mc3',
                       'rep',
                       'temperature',
+                      'dummy1',
+                      'dummy2',
                       'signal',
                       'cluster',
                       'obs') ## the dependent variable
