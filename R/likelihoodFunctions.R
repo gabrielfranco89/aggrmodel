@@ -131,6 +131,7 @@ logLikelihood <- function(data,
 loglikWrapper <- function(pars,
                           dataWrap,
                           mktWrap,
+                          sCovWrap,
                           covWrap,
                           corWrap,
                           betaWrap,
@@ -149,14 +150,16 @@ loglikWrapper <- function(pars,
     }
     mu <- designWrap %*% betaWrap
     if(positive) mu <- exp(mu)
+    ## Build model matrix -------------------
     if(covWrap == 'Homog_Uniform'){
+        cp <- ifelse(positive,exp(pars[2]),pars[2])
         sigmaList <- covMatrix(market = mktWrap,
                                group.name = 'Group',
                                type.name = 'type',
                                mkt.name = 'mkt',
                                timeVec = dataWrap$time,
                                sigPar = pars[1],
-                               corPar = ifelse(positive,exp(pars[2]),pars[2]),
+                               corPar = cp,
                                covType = 'Homog_Uniform',
                                corType = corWrap,
                                truncateDec = truncateDec)
@@ -177,7 +180,6 @@ loglikWrapper <- function(pars,
                                truncateDec = truncateDec)
     }
     if(covWrap == 'Heterog'){
-        ## <-------------------- UNDER CONSTRUCTION
         C <- length(unique(mktWrap[,2]))
         tvec <- unique(dataWrap$time)
         basisObj = create.bspline.basis(range(tvec),
@@ -186,12 +188,7 @@ loglikWrapper <- function(pars,
         B <- predict(basisObj, tvec)
         betaMC <- pars[1:(C*nBasisCov)]
         funcVarIn <- B %*% matrix(betaMC, ncol=3)
-        # betaMtx <- cbind(beta=as.matrix(betaMC),
-        #                  type=rep(1:C, each=nBasisCov))
-        # mcMtx <- tapply(betaMtx[,1],
-        #                 betaMtx[,2],
-        #                 function(x) B %*% x)
-        # funcVarIn <- matrix(unlist(mcMtx), ncol = C)
+        funcVarIn <- exp(funcVarIn)
         sigParIn <- pars[(C*nBasisCov+1):(length(pars)-(2*C))]
         corParIn <- pars[(C*nBasisCov+C+1):(length(pars)-C)]
         tauParIn  <- pars[((length(pars)-C+1):length(pars))]
@@ -212,28 +209,123 @@ loglikWrapper <- function(pars,
                                corType = corWrap,
                                truncateDec = truncateDec)
     }
-    lk <- logLikelihood(data = dataWrap,
-                        muVec = mu,
-                        covMtxList = sigmaList
-                        )
-    if(is.infinite(lk))
-        lk <- .Machine$double.xmax
-
+# Compute diff between sample cov and model cov ------
+    diffList <- purrr::map2(sigmaList, sCovWrap, `-`)
+    diffList <- lapply(diffList, abs)
+    normFrob <- lapply(diffList, norm, type = "F")
+ #   normFrob <- lapply(normFrob, function(x) x^2)
+    normFrob <- sqrt(Reduce("+", normFrob))
+#    if(verbWrap) message("norm =", normFrob)
     if(all(verbWrap & covWrap=='Heterog'))
-        message("\n lk =", round(lk,6),
-                "\n mean(betaPar) =", paste(round(apply(funcVarIn,2,mean),
-                                               4),
-                                         collapse=','),
-                "\n mean(sigPar) =", paste(round(sigParIn,4), collapse=','),
+        message("\n norm =", round(normFrob,6),
+                "\n mean(betaPar) =", paste(round(betaMC,4),collapse=','),
+                "\n sigPar =", paste(round(sigParIn,4), collapse=','),
                 "\n corPar =", paste(round(corParIn,4), collapse=','),
                 "\n tauPar =", paste(round(tauParIn,4), collapse=',')
                 )
-        if(all(verbWrap & !covWrap=='Heterog'))
-        message("\n lk =", round(lk,6),
-                "\n pars =", paste(round(pars,2),
-                                           collapse=',')
-                )
-    return(lk)
+    if(all(verbWrap & !covWrap=='Heterog'))
+        message("\n lk =", round(normFrob,6),
+                "\n pars =", paste(pars,
+                                   collapse=',')
+        )
+
+
+
+
+
+    if(is.nan(normFrob)){
+                # message("\n norm =", round(normFrob,6),
+                # "\n mean(betaPar) =", paste(round(c(betaMC),4), collapse=','),
+                # "\n sigPar =", paste(round(sigParIn,4), collapse=','),
+                # "\n corPar =", paste(round(corParIn,4), collapse=','),
+                # "\n tauPar =", paste(round(tauParIn,4), collapse=',')
+                # )
+        message(str(sigmaList))
+        message(str(sCovWrap))
+        message( str(diffList))
+        message(str(lapply(diffList, summary)))
+        message(str(lapply(diffList, norm, type = "F")))
+        myList <- list("sigmaList"=sigmaList,
+                       "sCovWrap"=sCovWrap,
+                       "diffList"=diffList,
+                       "pars" = pars,
+                       "mktWrap" = mktWrap)#,
+                #       "funcMtx" = funcVarIn,
+#                       "sigPar" = sigParIn,
+#                       "corPar" = corParIn,
+ #                      "tauPar" = tauParIn)
+        save(myList, file = "/tmp/myList.RData")
+    }
+
+    log(normFrob)
+#    else
+
+    # ## Loglik ----
+    # lk <- logLikelihood(data = dataWrap,
+    #                     muVec = mu,
+    #                     covMtxList = sigmaList
+    #                     )
+    # if(is.infinite(lk))
+    #     lk <- .Machine$double.xmax
+    #
+    # if(all(verbWrap & covWrap=='Heterog'))
+    #     message("\n lk =", round(lk,6),
+    #             "\n mean(betaPar) =", paste(round(apply(funcVarIn,2,mean),
+    #                                            4),
+    #                                      collapse=','),
+    #             "\n mean(sigPar) =", paste(round(sigParIn,4), collapse=','),
+    #             "\n corPar =", paste(round(corParIn,4), collapse=','),
+    #             "\n tauPar =", paste(round(tauParIn,4), collapse=',')
+    #             )
+    #     if(all(verbWrap & !covWrap=='Heterog'))
+    #     message("\n lk =", round(lk,6),
+    #             "\n pars =", paste(round(pars,2),
+    #                                        collapse=',')
+    #             )
+    # return(lk)
+}
+
+#' Title
+#'
+#' @param x
+#' @param dataWrap
+#' @param mktWrap
+#' @param sCovWrap
+#' @param covWrap
+#' @param corWrap
+#' @param betaWrap
+#' @param designWrap
+#' @param nCons
+#' @param nBasisCov
+#' @param nOrderCov
+#' @param verbWrap
+#' @param positive
+#' @param truncateDec
+#'
+#' @return
+#' @export
+#' @importFrom pracma grad
+#'
+#' @examples
+gradLK <- function(x, dataWrap,mktWrap,sCovWrap,covWrap,corWrap,betaWrap,
+                   designWrap,nCons,nBasisCov,nOrderCov, ## for heterog model
+                   verbWrap,positive = FALSE,truncateDec = NULL){
+    pracma::grad(f = loglikWrapper,
+                 x0=x,
+                  dataWrap=dataWrap,
+                  mktWrap = mktWrap,
+                  sCovWrap = sCovWrap,
+                  covWrap = covWrap,
+                  corWrap = corWrap,
+                  betaWrap = betaWrap,
+                  designWrap = designWrap,
+                  nCons =nCons,
+                  nBasisCov = nBasisCov,
+                  nOrderCov = nOrderCov, ## for heterog model
+                  verbWrap = FALSE,
+                  positive = positive,
+                  truncateDec = truncateDec
+    )
 }
 
 
