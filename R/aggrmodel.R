@@ -200,7 +200,7 @@ aggrmodel <- function(formula=NULL,
         })
         residListGroup <- lapply(residList, function(x){
             nRep <- length(x)
-            Reduce("+",x) / (nRep - 1)
+            Reduce("+",x) / (nRep - C)
         }
         )
         rm(residList)
@@ -225,9 +225,9 @@ aggrmodel <- function(formula=NULL,
                      verbWrap = optVerbose,
                      hessian=TRUE)
         parOut <- opt$par
-        lkOut <- opt$value
+        normOut <- opt$value
         if(verbose)
-            message(paste("Norm value:",lkOut))
+            message(paste("Norm value:",normOut))
 
         ## W.2 Update Sigma estimates
         if(positive_restriction){
@@ -344,14 +344,16 @@ aggrmodel <- function(formula=NULL,
             } ## end if/else cicle
         } ## end if !positive_restriction
         ## W.4 UPDATES
-        lkDiff <- abs(lkOut - lkIn)
         betaIn <- as.numeric(betaOut)
         parIn  <- parOut
-        lkIn <- lkOut
-        lkVec[itCount] <- logLikelihood(data = dd,
+        lkOut <- logLikelihood(data = dd,
                                         muVec = X %*% betaIn,
                                         covMtxList = sigmaOutList
-        )
+                )
+        if(verbose) message("lk value: ",lkOut)
+        lkVec[itCount] <- lkOut
+        lkDiff <- abs(lkOut - lkIn)
+        lkIn <- lkOut
         itCount <- itCount + 1
         if(itCount == itMax)
             warning(paste("Loop stopped at max iteration count:",itMax))
