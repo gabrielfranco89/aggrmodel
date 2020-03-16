@@ -190,7 +190,7 @@ aggrmodel <- function(formula=NULL,
         })
         residListGroup <- lapply(residList, function(x){
             nRep <- length(x)
-            Reduce("+",x) / (nRep - C)
+            Reduce("+",x) / (nRep - 1)
         }
         )
         rm(residList)
@@ -455,6 +455,7 @@ aggrmodel <- function(formula=NULL,
                 'lkVec' = lkVec,
                 'betaSE' = betaSE)
     if(returnFitted) outList[["fitted"]] <- dd
+    else outList[["residuals"]] <- dd$resid
     if(optSampleCovMatrix) outList[["normValues"]] <- normVec
     if(!is.null(formula))
         outList[['formula']] <- formula
