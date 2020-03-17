@@ -460,7 +460,7 @@ aggrmodel <- function(formula=NULL,
     if(!is.null(formula))
         outList[['formula']] <- formula
     if(covType=='Heterog')
-        outList["covCurves"] <- funcVarIn
+        outList[["covCurves"]] <- funcVarIn
     class(outList)='aggrmodel'
     return(outList)
 }
