@@ -66,8 +66,8 @@ aggrmodel <- function(formula=NULL,
                       corType = 'periodic',
                       optSampleCovMatrix = TRUE,
                       sigPar_init = NULL,
-                      corPar_init = 20,
-                      tauPar_init = 1,
+                      corPar_init = NULL,
+                      tauPar_init = NULL,
                       betaCov_init = NULL,
                       returnFitted = TRUE,
                       positive_restriction = FALSE,
@@ -508,7 +508,8 @@ get_inits <- function(X, I, data, C,
 
     if(covType == 'Homog_Uniform'){
         sigPar <- ifelse(is.null(sigPar_init), sigma_fit, sigPar_init)
-        corPar <- corPar_init
+        if(is.null(corPar_init)) corPar <- 1
+        else corPar <- corPar_init
         parIn <- c(sigPar, corPar)
         lowBoundVec <- c(1e-4, 1e-4)
         ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
@@ -595,12 +596,12 @@ get_inits <- function(X, I, data, C,
             #                                           rep(1:C, each=n_basis_cov),FUN=mean))
         else
             sigPar <- sigPar_init
-        if(length(corPar_init)==1)
-            corPar <- rep(corPar_init, C)
+        if(is.null(corPar_init))
+            corPar <- rep(1, C)
         else
             corPar <- corPar_init
-        if(length(tauPar_init)==1)
-            tauPar <- rep(tauPar_init, C)
+        if(is.null(tauPar_init))
+            tauPar <- rep(1, C)
         else
             tauPar<- tauPar_init
         parIn <- c(betaCov_init,sigPar, corPar, tauPar)
