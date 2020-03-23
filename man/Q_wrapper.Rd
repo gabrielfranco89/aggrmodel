@@ -8,7 +8,6 @@ Q_wrapper(
   covPar,
   data,
   market,
-  betaPar,
   piPar,
   pTab,
   B,
@@ -19,6 +18,7 @@ Q_wrapper(
   J,
   basisFunction,
   n_order,
+  xbeta,
   covWrap,
   corWrap
 )
@@ -29,8 +29,6 @@ Q_wrapper(
 \item{data}{Data Frame with 4 columns in the following order: Group, Replicates, Time, Signal}
 
 \item{market}{Data Frame with 4 columns in the following order: Group, Replicates, Time, Signal}
-
-\item{betaPar}{Mean curves parameters}
 
 \item{piPar}{Probabilities parameters}
 
@@ -55,6 +53,8 @@ Q_wrapper(
 \item{covWrap}{covariance structure}
 
 \item{corWrap}{correlation structure}
+
+\item{betaPar}{Mean curves parameters}
 }
 \value{
 

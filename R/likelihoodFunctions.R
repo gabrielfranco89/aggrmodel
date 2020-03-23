@@ -366,8 +366,12 @@ Q_function <- function(data,sigmaList,xbetaList,probTab,B){
 #'
 #' @return
 #' @export
-Q_wrapper <- function(covPar,data,market,betaPar,piPar,pTab,B,t,K,C,I,J,
+Q_wrapper <- function(covPar,data,market,
+                      piPar,
+                      pTab,
+                      B,t,K,C,I,J,
                       basisFunction,n_order,
+                      xbeta,
                       covWrap, corWrap){
     if(covWrap == 'Homog_Uniform'){
     covPar <- matrix(covPar, nrow=B)
@@ -395,10 +399,6 @@ Q_wrapper <- function(covPar,data,market,betaPar,piPar,pTab,B,t,K,C,I,J,
             sig
         })
     }
-    XList <- buildX(market = market,timeVec = t,n_basis = K,
-                    basis = basisFunction,n_order = n_order)
-    X <- XList
-    xbeta <- lapply(X, function(x) apply(betaPar, 2, function(bt) x %*% bt))
     ## SEND TO Q_Function
     Q_function(data=data,
                sigmaList = sigMtxList,

@@ -4,7 +4,7 @@
 \alias{simpleAggrmodel}
 \title{Fit a simple aggregated model}
 \usage{
-simpleAggrmodel(data, market, n_basis, n_order, basisFunction)
+simpleAggrmodel(data, market, n_type, n_basis, n_order, basisFunction)
 }
 \arguments{
 \item{data}{Dataset containing group, replicates (if any), time and aggregated signal}

@@ -20,7 +20,9 @@ aggrmodel_cluster(
   cicleRep = FALSE,
   n_order = 4,
   covType = "Homog_Uniform",
-  corType = "periodic",
+  corType = "exponential",
+  optMethod = "L-BFGS-B",
+  corPar_init = NULL,
   diffTol = 1e-06,
   itMax = 100,
   verbose = FALSE
@@ -75,7 +77,7 @@ Fit aggregated model with clusters
 library(dplyr)
 
 data = simuData \%>\%
-  select(group=Group, rep=Rep, time=Time, y=Load)
+  select(group, rep, time, y)
 df=data
 mkt = market
 mkt$Cluster=NULL

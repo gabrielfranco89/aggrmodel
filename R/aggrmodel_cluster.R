@@ -7,29 +7,34 @@
 #' @param basisFunction Character indicating which basis: 'B-Splines' (default) or 'Fourier'
 #' @param data Dataset containing group, replicates (if any), time and aggregated signal
 #'
+#' @importFrom tidyr spread
 #' @return lm object
-#' @export
+#'
 simpleAggrmodel <- function(data,
                             market,
+                            n_type,
                             n_basis,
                             n_order,
                             basisFunction){
-  XList <- buildX(market=market,
+  mktLong <- tidyr::spread(market,type,num)
+  groupList <- subset(data, select=c(group))
+  mktLong <- merge(groupList,mktLong)
+  X <- buildX(market=mktLong,
                   timeVec = data$time,
+                  nType = n_type,
                   n_basis = n_basis,
                   n_order = n_order,
                   basis = basisFunction)
-  I <- length(unique(data$rep))
-  X <- lapply(XList,
-              function(x)
-                do.call(rbind,replicate(n=I,
-                                        expr=x,
-                                        simplify=FALSE)
-                )
-  )
-  X <- do.call(rbind, X)
-  X <- cbind(y=data$y, X)
-  X <- as.data.frame(X)
+  # I <- length(unique(data$rep))
+  # X <- lapply(XList,
+  #             function(x)
+  #               do.call(rbind,replicate(n=I,
+  #                                       expr=x,
+  #                                       simplify=FALSE)
+  #               )
+  # )
+  # X <- do.call(rbind, X)
+  X <- data.frame(y=data$y, X)
   fitAggr <- lm(y~.-1, data = X)
   fitAggr
 }
@@ -47,7 +52,7 @@ simpleAggrmodel <- function(data,
 #' @param n_cluster Number of grouping clusters
 #'
 #' @return A list containing: data set with "group" and "cluster" indicating the fit with minor squared root error and an lm object of the chosen clustering configuration
-#' @export
+#'
 #' @importFrom purrr map2
 #'
 getClusterInitials <- function(data,
@@ -58,66 +63,129 @@ getClusterInitials <- function(data,
                                n_trials,
                                bFunc
                                ){
-  ## TODO
-  ## [] Limit max n_trials
-
   ## Separate dataset in clusters
   C <- length(unique(market[,2]))
   J <- length(unique(data$group))
   smpObl <- rep(1:n_cluster, each=C)
   if((J-length(smpObl)) <0)
     stop('Cannot fit clusters if number of groups at each cluster are smaller than number of clusters')
-  smpVec <- replicate(n = n_trials,
-                      expr = sample(
-                        c(smpObl, sample(1:n_cluster, size=J-length(smpObl),replace=TRUE))
-                        ),
-                      simplify = TRUE
-  )
+  smpVec <- matrix(nrow=J, ncol = n_trials)
+  itmax=0
+  for(i in 1:n_trials){
+    if(i==1)
+      smpVec[,i] <-  base::sample(c(smpObl,
+                                 sample(x=1:n_cluster,
+                                        size = c(J-length(smpObl)),
+                                        replace = TRUE) )
+      )
+    else{
+      flag = FALSE
+      while(!flag & itmax < c(n_trials + 1e3)){
+        cl <- base::sample(c(smpObl,
+                                 sample(x=1:n_cluster,
+                                        size = c(J-length(smpObl)),
+                                        replace = TRUE) )
+        )
+        cl <- as.numeric(factor(cl, levels = unique(cl)))
+        if(i==2){
+          flag <- identical(cl, smpVec[,1])
+        } else {
+          flag <- apply(smpVec[,1:c(i-1)],2, function(x) identical(x,cl))
+        }
+        flag <- all(flag == FALSE)
+        if(flag) smpVec[,i] <- cl
+        itmax=itmax+1
+      }
+    }
+  }
+  if(any(is.na(smpVec))){
+    smpVec <- matrix(smpVec[!is.na(smpVec)],nrow=J)
+    n_trials <- ncol(smpVec)
+  }
   grps <- unique(data$group)
   trial_dd <- data.frame(
     group = rep(grps, times = n_trials),
     cluster= c(smpVec),
     trial=rep(1:n_trials, each = length(grps))
   )
-  fitList <- tapply(X=trial_dd$cluster,INDEX = trial_dd$trial,
-                FUN = function(x,dd,mkt,K,nord,bFunc){
-                  ## Merge datasets
-                  tmp <- data.frame(group=grps,
-                                    cluster=x)
-                  mktc <- merge(mkt, tmp)
-                  mktsplit <- split(mktc, mktc$cluster)
-                  ddc <- merge(dd,tmp)
-                  ddsplit <- split(ddc,ddc$cluster)
-                  ## Apply fit
-                  fitListOut <- purrr::map2(ddsplit,
-                                         mktsplit,
-                                         ~simpleAggrmodel(.x,.y,
-                                                          n_basis = K,
-                                                          basisFunction = bFunc,
-                                                          n_order = nord))
-                  sumList <- lapply(fitListOut, function(x) summary(x)$sigma)
-                  Reduce('+',sumList)
-                },
-                ## tapply args
-                dd=data,  mkt=market,  K=n_knots,  nord=n_order,  bFunc=bFunc)
+  mktLong <- tidyr::spread(market,type,num)
+  grp_dd <- data.frame(group = data$group)
+  mktLong <- merge(grp_dd,mktLong)
+  X <- buildX(market=mktLong,
+              timeVec = data$time,
+              nType = C,
+              n_basis = n_knots,
+              n_order = n_order,
+              basis = bFunc)
+  fitList <- by(trial_dd,INDICES = trial_dd$trial,
+                FUN = function(x){
+                  mktc <- merge(mktLong, x, by="group")
+                  x_spliter <- mktc$cluster
+                  fit_dd <- data.frame(y=data$y, X)
+                  fit_dd_split <- split(fit_dd, x_spliter)
+                  fit_list <- lapply(fit_dd_split,
+                                     function(ff){
+                                       lm(y~.-1,data=ff)
+                                     })
+                  SR_list <- lapply(fit_list, function(x) sum(abs(resid(x))))
+                  Reduce('+',SR_list)
+                })
+  #
+  # fitList <- tapply(X=trial_dd$cluster,INDEX = trial_dd$trial,
+  #               FUN = function(x){
+  #                 ## Merge datasets
+  #                 tmp <- data.frame(group=grps,
+  #                                   cluster=x)
+  #
+  #                 mktc <- merge(market, tmp)
+  #                 mktsplit <- split(mktc, mktc$cluster)
+  #                 ddc <- merge(data,tmp)
+  #                 ddsplit <- split(ddc,ddc$cluster)
+  #                 ## Apply fit
+  #
+  #
+  #
+  #                 fitListOut <- purrr::map2(ddsplit,
+  #                                        mktsplit,
+  #                                        ~simpleAggrmodel(.x,.y,
+  #                                                         n_basis = K,
+  #                                                         n_type = nt,
+  #                                                         basisFunction = bFunc,
+  #                                                         n_order = nord))
+  #                 SR_list <- lapply(fitListOut, function(x) sum(abs(resid(x))))
+  #                 Reduce('+',SR_list)
+  #               })
+
+
   ## Choose smaller error and output the selected cluster config
   minErr <- as.integer(which.min(fitList))
   clusterOut <- subset(trial_dd, trial == minErr)
+  x <- clusterOut
   clusterOut$trial <- NULL
   rownames(clusterOut) <- NULL
-  ## Return fit objects also
-  mktc <- merge(market, clusterOut)
-  mktsplit <- split(mktc, mktc$cluster)
-  ddc <- merge(data,clusterOut)
-  ddsplit <- split(ddc,ddc$cluster)
-  ## Apply fit
-  fitListOut <- purrr::map2(ddsplit,
-                            mktsplit,
-                            ~simpleAggrmodel(.x,.y,
-                                             n_basis = n_knots,
-                                             basisFunction = bFunc,
-                                             n_order = n_order))
-  return(list('clusterConfig'=clusterOut,
+  mktc <- merge(mktLong, x, by="group")
+  x_spliter <- mktc$cluster
+  fit_dd <- data.frame(y=data$y, X)
+  fit_dd_split <- split(fit_dd, x_spliter)
+  fitListOut <- lapply(fit_dd_split,
+                     function(ff){
+                       lm(y~.-1,data=ff)
+                     })
+  #
+  # ## Return fit objects also
+  # mktc <- merge(market, clusterOut)
+  # mktsplit <- split(mktc, mktc$cluster)
+  # ddc <- merge(data,clusterOut)
+  # ddsplit <- split(ddc,ddc$cluster)
+  # ## Apply fit
+  # fitListOut <- purrr::map2(ddsplit,
+  #                           mktsplit,
+  #                           ~simpleAggrmodel(.x,.y,
+  #                                            n_basis = n_knots,
+  #                                            n_type = C,
+  #                                            basisFunction = bFunc,
+  #                                            n_order = n_order))
+   return(list('clusterConfig'=clusterOut,
               'fitList' = fitListOut))
 }
 
@@ -147,12 +215,13 @@ getClusterInitials <- function(data,
 #'
 #' @name aggrmodel_cluster
 #'
+#' @import optimx
 #' @importFrom mvtnorm dmvnorm
 #' @export
 #' @examples library(dplyr)
 #'
 #' data = simuData %>%
-#'   select(group=Group, rep=Rep, time=Time, y=Load)
+#'   select(group, rep, time, y)
 #' df=data
 #' mkt = market
 #' mkt$Cluster=NULL
@@ -177,7 +246,9 @@ aggrmodel_cluster <- function(formula=NULL,
                               cicleRep = FALSE,
                               n_order = 4,
                               covType = 'Homog_Uniform',
-                              corType = 'periodic',
+                              corType = 'exponential',
+                              optMethod = "L-BFGS-B",
+                              corPar_init = NULL,
                               diffTol = 1e-6,
                               itMax = 100,
                               verbose=FALSE){
@@ -194,25 +265,30 @@ aggrmodel_cluster <- function(formula=NULL,
     stop('Market must have 3 columns in the following order: Group, Type and Number of subjects. Please check your market input.')
 
   ## Preamble
-  require(Matrix,quietly=TRUE)
   y = data[[substitute(Y)]]
   t = data[[substitute(timeVar)]]
   t = t/max(t)
-  grps = data[[substitute(groupVar)]]
-  reps = data[[substitute(repVar)]]
+  #    if(is.null(timeVar2)) t2 <- NULL
+  #    else t2 <- data[[substitute(timeVar2)]]
+  grps = as.factor(data[[substitute(groupVar)]])
+  reps = as.factor(data[[substitute(repVar)]])
   J = length(unique(grps))
   I = length(unique(reps))
   T = length(unique(t))
   C = length(unique(market[,2]))
   B = n_cluster
   K = n_basis
-  dd <- data.frame(group=grps,
-                   rep=reps,
+  dd <- data.frame(group=as.integer(grps),
+                   rep=as.integer(reps),
                    time=t,
                    y = y)
-  dd <- dd[order(dd[,2], dd[,1], dd[,3]),]
-  y <- dd[,4]
-
+  #    if(!is.null(timeVar2)) dd$time2 <- t2
+  dd <- dd[order(dd$group, dd$rep, dd$time),]
+  y <- dd$y
+  t <- dd$time
+  colnames(market) <- c("group","type","num")
+  market$group <- as.integer(factor(market$group,
+                                    levels=levels(grps)))
   ## Set all initials parameters
   cl_init <- getClusterInitials(data=dd,market=market,
                                 n_knots=n_basis,n_order=n_order,
@@ -221,14 +297,17 @@ aggrmodel_cluster <- function(formula=NULL,
   cluster_init <- cl_init[[1]]
   beta_init <- unlist(lapply(cl_init[[2]],coef))
   beta_init <- matrix(beta_init, ncol=B)
-  sigma_init <- unlist(lapply(cl_init[[2]],function(x) summary(x)$sigma))
-  sigma_init <- matrix(sqrt(sigma_init), ncol=B)
-  theta_init <- matrix(10, ncol=B)
+  sigPar_init <- unlist(lapply(cl_init[[2]],function(x) summary(x)$sigma))
+  sigPar_init <- matrix(sqrt(sigPar_init), ncol=B)
+  if(is.null(corPar_init))
+    corPar_init <- matrix(20, ncol=B)
+  else
+    corPar_init <- matrix(corPar_init, ncol=B)
   if(covType == 'Homog_Uniform'){
-    cp_in <- c(sigma_init,theta_init)
+    cp_in <- c(sigPar_init,corPar_init)
   }
   if(covType == 'Homog'){
-    cp_in <- c(rep(sigma_init,C),rep(theta_init,3))
+    cp_in <- c(rep(sigPar_init,C),rep(corPar_init,3))
   }
   pi_init <- prop.table(table(cluster_init[,2]))
   pi_init <- matrix(pi_init, ncol=B)
@@ -236,14 +315,30 @@ aggrmodel_cluster <- function(formula=NULL,
   lkIn <- Inf
   lkDiff = diffTol+1
   n_it = 1
-  XList <- buildX(market = market,timeVec = t,n_basis = K,
-                  basis = basisFunction,n_order = n_order)
+  mktLong <- tidyr::spread(market,type,num)
+  groupList <- subset(dd, select=c(group,rep))
+  mktLong <- merge(groupList,mktLong)
+  mktList <- subset(mktLong, rep == reps[1])
+  mktList <- subset(mktList, select = -rep)
+  mktList <- split(mktList, mktList$group)
+  XList <- lapply(mktList, function(m){
+    X <- buildX(market = m, nType= C,
+                timeVec = unique(t),n_basis = K,
+                basis = basisFunction,n_order = n_order)
+    X
+  }
+  )
   X <- XList
+  mktLong$rep <- NULL
+  XLong <-  buildX(market = mktLong, nType= C,
+                   timeVec = t,n_basis = K,
+                   basis = basisFunction,n_order = n_order)
 
   while(lkDiff > diffTol & n_it < itMax){
     if(verbose)
       message(paste("\nIteration num ",n_it))
-    ## Compute prob for E-Step
+    # E-Step --------------------------------------------------------------
+    ## Compute prob for E-Step ----
     if(covType == 'Homog_Uniform'){
       covPar <- matrix(cp_in, nrow=B)
       sigMtxList <- lapply(1:B, function(b){
@@ -270,13 +365,13 @@ aggrmodel_cluster <- function(formula=NULL,
         sig
       })
     }
-    xbeta <- lapply(X, function(x) apply(beta_init, 2, function(bt) x %*% bt))
+    xbeta <- lapply(X, function(x)  x %*% beta_init)
     probTab_init <- matrix(nrow=I*J, ncol=(B))
-    probTab_names <- data.frame(reps = vector(mode=class(reps),length = I*J),
-                                grps = vector(mode=class(grps),length = I*J))
+    probTab_names <- data.frame(reps = vector(mode="integer",length = I*J),
+                                grps = vector(mode="integer",length = I*J))
     k=1
-    for(i in unique(reps)){
-      for(j in unique(grps)){
+    for(i in unique(dd$rep)){
+      for(j in unique(dd$group)){
         for(b in 1:B){
           probTab_names$reps[k] = i
           probTab_names$grps[k] = j
@@ -309,32 +404,61 @@ aggrmodel_cluster <- function(formula=NULL,
       }
     }
     probTab <- cbind(probTab_names, probTab_ratio)
-    ## M-Step ----
-    opt <- optim(par = cp_in,
-                 fn = Q_wrapper,
-                 #            lower=c(rep(-1e-60,B),rep(0,B)),
-                 #             upper=c(rep(1e60,2*B)),
-                 #             method = "L-BFGS-B",
-                 data = dd,
-                 market = market,
-                 betaPar = beta_init,
-                 piPar = pi_init,
-                 pTab = probTab,
-                 B=B,
-                 t=t,
-                 K=n_basis,
-                 I=I,
-                 J=J,
-                 C=C,
-                 basisFunction=basisFunction,
-                 n_order=n_order,
-                 covWrap=covType,
-                 corWrap=corType
-    )
+    ## M-Step -----------------------------------------------------------------
+    if(verbose) message("Optimizing...")
+    if(optMethod=="bobyqa"){
+      opt <- optimx::optimx(par = cp_in,
+                            fn = Q_wrapper,
+                            lower= rep(1e-4, length(cp_in)),
+                            method = "bobyqa",
+                            data = dd,
+                            market = market,
+                            piPar = pi_init,
+                            pTab = probTab,
+                            B=B,
+                            t=t,
+                            K=n_basis,
+                            xbeta =xbeta,
+                            I=I,
+                            J=J,
+                            C=C,
+                            basisFunction=basisFunction,
+                            n_order=n_order,
+                            covWrap=covType,
+                            corWrap=corType
+      )
+    }
+    else{
+      opt <-optim(par = cp_in,
+                  fn = Q_wrapper,
+                  lower= rep(1e-4, length(cp_in)),
+                  method = "L-BFGS-B",
+                  data = dd,
+                  market = market,
+                  piPar = pi_init,
+                  pTab = probTab,
+                  B=B,
+                  t=t,
+                  K=n_basis,
+                  xbeta =xbeta,
+                  I=I,
+                  J=J,
+                  C=C,
+                  basisFunction=basisFunction,
+                  n_order=n_order,
+                  covWrap=covType,
+                  corWrap=corType
+      )
+    }
     lkOut <- opt$value
-    if(verbose) message(paste("\nlk value:", round(lkOut,6)))
-    cp_out <-opt$par
-    if(verbose) message(paste("\ncovPar estimates:",paste(round(opt$par,4),collapse=', ')))
+    if(optMethod=="bobyqa")
+      cp_out <- as.numeric(opt[1:length(cp_in)])
+    else
+      cp_out <-opt$par
+    if(verbose) {
+      message(paste("\nlk value:", round(lkOut,6)))
+      message("parameters: ", paste(round(cp_out,4),collapse = ","))
+    }
     ## Covariance matrices out ----
     if(covType=='Homog_Uniform'){
       covPar <- matrix(cp_out, nrow=B)
@@ -349,8 +473,11 @@ aggrmodel_cluster <- function(formula=NULL,
         sig
       })
       sigLongList <- lapply(sigMtxList_out,
-                            function(m)
-                              Matrix::bdiag(replicate(n=I,Matrix::bdiag(m))))
+                            function(m){
+                              mtx <- lapply(m,function(x) Matrix::bdiag(replicate(n=I,x,simplify=FALSE)))
+                              mtx <- Matrix::bdiag(mtx)
+                              mtx
+                            })
     }
     if(covType=='Homog'){
       covPar <- matrix(cp_out, ncol=B,byrow=TRUE)
@@ -365,16 +492,20 @@ aggrmodel_cluster <- function(formula=NULL,
         sig
       })
       sigLongList <- lapply(sigMtxList_out,
-                            function(m)
-                              Matrix::bdiag(replicate(n=I,Matrix::bdiag(m))))
+                            function(m){
+                              mtx <- lapply(m,function(x) Matrix::bdiag(replicate(n=I,x,simplify=FALSE)))
+                              mtx <- Matrix::bdiag(mtx)
+                              mtx
+                            })
     }
     probLong <- list()
+    probTab2 <- probTab[order(probTab$grps, probTab$reps),]
         for(b in 1:B){
-          probLong[[b]] <- diag(rep(probTab[,b+2],each=T))
+          probLong[[b]] <- diag(rep(probTab2[,b+2],each=T))
         }
     ## COMPUTE BETAs ----
-    XLong <- do.call(rbind,XList) ## pile by group
-    XLong <- do.call(rbind, replicate(n=I,XLong, simplify = FALSE)) ## replicate piling
+    # XLong <- do.call(rbind,XList) ## pile by group
+    # XLong <- do.call(rbind, replicate(n=I,XLong, simplify = FALSE)) ## replicate piling
     beta_out <- beta_init ## initiate
     for(b in 1:B){
       tmpLeft <- t(XLong)%*%probLong[[b]]%*%
@@ -417,7 +548,7 @@ aggrmodel_cluster <- function(formula=NULL,
         beta_out[,b] <- as.numeric(Matrix::solve(tmpLeft,tmpRight))
       } ## end if/else cicle
     }
-    pi_out <- apply(probTab,2,mean)
+    pi_out <- apply(probTab[,-c(1:2)],2,mean)
     ## Check convergence & updates
     lkDiff <- abs(lkIn - lkOut)
     beta_init <- beta_out
