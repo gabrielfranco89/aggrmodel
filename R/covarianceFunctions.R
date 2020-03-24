@@ -51,7 +51,7 @@ periodicCorMtx <- function(timeVec,
     ##              function(x) exp(-2* (sin(pi*x)^2)*corPar))
     baseMtx <- pi*baseMtx
     baseMtx <- sin(baseMtx)^2
-    mtx <- exp(-2* baseMtx * corPar)
+    mtx <- exp(-2* baseMtx * (1/ corPar))
     if(!is.null(truncateDec)) mtx <- round(mtx,truncateDec)
     return(mtx)
 }
