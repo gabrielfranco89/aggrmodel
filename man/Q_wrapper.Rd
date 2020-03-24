@@ -10,6 +10,8 @@ Q_wrapper(
   market,
   piPar,
   pTab,
+  optWrap,
+  sCovList,
   B,
   t,
   K,

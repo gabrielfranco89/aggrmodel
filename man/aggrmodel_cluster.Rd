@@ -22,6 +22,7 @@ aggrmodel_cluster(
   covType = "Homog_Uniform",
   corType = "exponential",
   optMethod = "L-BFGS-B",
+  optLk = TRUE,
   corPar_init = NULL,
   diffTol = 1e-06,
   itMax = 100,
