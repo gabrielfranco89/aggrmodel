@@ -326,10 +326,10 @@ Q_function <- function(data,sigmaList,xbetaList,probTab,B){
     logLikOut=0
     for(j in unique(data$group)){
         for(i in unique(data$rep)){
-            yij <- subset(data, group==j&rep==i)$y
+            yij <- data[data$group==j&data$rep==i,"y"]
             for(b in 1:B){
                 xbeta_jb <- xbetaList[[j]][,b]
-                prob_ijb <- subset(probTab, grps==j&reps==i)[,b+2]
+                prob_ijb <- probTab[probTab$grps==j&probTab$reps==i,b+2]
                 prob_ijb <- as.numeric(prob_ijb)
                 sigma_jb <- as.matrix(sigmaList[[b]][[j]])
                 logLikOut <- logLikOut +
@@ -369,6 +369,8 @@ Q_function <- function(data,sigmaList,xbetaList,probTab,B){
 Q_wrapper <- function(covPar,data,market,
                       piPar,
                       pTab,
+                      optWrap,
+                      sCovList,
                       B,t,K,C,I,J,
                       basisFunction,n_order,
                       xbeta,
@@ -400,9 +402,24 @@ Q_wrapper <- function(covPar,data,market,
         })
     }
     ## SEND TO Q_Function
-    Q_function(data=data,
+      if(!optWrap){
+          out <- numeric(B)
+          for(b in 1:B){
+              sigmaList <- sigMtxList[[b]]
+              sCovWrap <- sCovList[[b]]
+              # Compute diff between sample cov and model cov ------
+              diffList <- purrr::map2(sigmaList, sCovWrap, `-`)
+              diffList <- lapply(diffList, abs)
+              normFrob <- lapply(diffList, norm, type = "F")
+              out[b] <- sqrt(Reduce("+", normFrob))
+          }
+##          message("norm:",log(sum(out)))
+          return(log(sum(out)))
+      } else {
+        Q_function(data=data,
                sigmaList = sigMtxList,
                xbetaList = xbeta,
                probTab = pTab,
                B=B)
+      }
 }
