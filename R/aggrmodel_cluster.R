@@ -248,6 +248,7 @@ aggrmodel_cluster <- function(formula=NULL,
                               covType = 'Homog_Uniform',
                               corType = 'exponential',
                               optMethod = "L-BFGS-B",
+                              optLk = TRUE,
                               corPar_init = NULL,
                               diffTol = 1e-6,
                               itMax = 100,
@@ -268,8 +269,6 @@ aggrmodel_cluster <- function(formula=NULL,
   y = data[[substitute(Y)]]
   t = data[[substitute(timeVar)]]
   t = t/max(t)
-  #    if(is.null(timeVar2)) t2 <- NULL
-  #    else t2 <- data[[substitute(timeVar2)]]
   grps = as.factor(data[[substitute(groupVar)]])
   reps = as.factor(data[[substitute(repVar)]])
   J = length(unique(grps))
@@ -282,13 +281,17 @@ aggrmodel_cluster <- function(formula=NULL,
                    rep=as.integer(reps),
                    time=t,
                    y = y)
-  #    if(!is.null(timeVar2)) dd$time2 <- t2
-  dd <- dd[order(dd$group, dd$rep, dd$time),]
+   dd <- dd[order(dd$group, dd$rep, dd$time),]
   y <- dd$y
   t <- dd$time
   colnames(market) <- c("group","type","num")
   market$group <- as.integer(factor(market$group,
                                     levels=levels(grps)))
+  grp_rep <- rep(1:(I*J),each=T)
+  dd_order <- data.frame(rep=rep(1:I,times=J),
+                         group=rep(1:J,each=I),
+                         id=1:(I*J)
+                         )
   ## Set all initials parameters
   cl_init <- getClusterInitials(data=dd,market=market,
                                 n_knots=n_basis,n_order=n_order,
@@ -321,18 +324,17 @@ aggrmodel_cluster <- function(formula=NULL,
   mktList <- subset(mktLong, rep == reps[1])
   mktList <- subset(mktList, select = -rep)
   mktList <- split(mktList, mktList$group)
-  XList <- lapply(mktList, function(m){
-    X <- buildX(market = m, nType= C,
-                timeVec = unique(t),n_basis = K,
-                basis = basisFunction,n_order = n_order)
-    X
+  X <- lapply(mktList, function(m){
+    buildX(market = m, nType= C,
+           timeVec = unique(t),n_basis = K,
+           basis = basisFunction,n_order = n_order)
   }
   )
-  X <- XList
   mktLong$rep <- NULL
   XLong <-  buildX(market = mktLong, nType= C,
                    timeVec = t,n_basis = K,
                    basis = basisFunction,n_order = n_order)
+
 
   while(lkDiff > diffTol & n_it < itMax){
     if(verbose)
@@ -366,45 +368,53 @@ aggrmodel_cluster <- function(formula=NULL,
       })
     }
     xbeta <- lapply(X, function(x)  x %*% beta_init)
-    probTab_init <- matrix(nrow=I*J, ncol=(B))
-    probTab_names <- data.frame(reps = vector(mode="integer",length = I*J),
-                                grps = vector(mode="integer",length = I*J))
-    k=1
-    for(i in unique(dd$rep)){
-      for(j in unique(dd$group)){
-        for(b in 1:B){
-          probTab_names$reps[k] = i
-          probTab_names$grps[k] = j
-          yij <- subset(dd, rep==i & group==j)$y
-          probTab_init[k,b] <- mvtnorm::dmvnorm(x = as.numeric(yij),
-                                                mean = as.numeric(c(xbeta[[j]][,b])),
-                                                sigma = as.matrix(sigMtxList[[b]][[j]]),
-                                                log=TRUE)
-        }
-        k=k+1
-      }
+    probTab <- data.frame(
+    reps = rep(1:I, times=J),
+    grps =  rep(1:J, each=I)
+    )
+    probTab <- cbind(probTab, matrix(nrow=I*J,ncol=B))
+    for(b in 1:B){
+      tmp <- by(data = dd,INDICES = grp_rep,FUN = function(df){
+        j <- df$group[1]
+        i <- df$rep[1]
+        mvtnorm::dmvnorm(x = as.numeric(df$y),
+                         mean = as.numeric(c(xbeta[[j]][,b])),
+                         sigma = as.matrix(sigMtxList[[b]][[j]]),
+                         log=TRUE)
+      })
+      probTab[,c(2+b)] <- pi_init[b]*exp(as.numeric(tmp))
     }
-    for(k in 1:(I*J)){
-      for(b in 1:B){
-        probTab_init[k,b] <- probTab_init[k,b] + log(pi_init[1,b])
-      }
-    }
-    denomProb <- log(rowSums(exp(probTab_init)))
-    probTab_ratio=probTab_init ## initiate
-    for(k in 1:(I*J)){
-      for(b in 1:B){
-        probTab_ratio[k,b] <- probTab_init[k,b] - denomProb[k]
-      }
-      if(all(exp(probTab_ratio[k,])==0) | all(is.infinite(exp(probTab_ratio[k,])))){ ## if all probs are zero
-        b1 <- which.min(probTab_init[k,])
-        probTab_ratio[k,] <- rep(0,times=B)
-        probTab_ratio[k,b1] <- 1
-      }else{
-        probTab_ratio[k,] <- exp(probTab_ratio[k,])
-      }
-    }
-    probTab <- cbind(probTab_names, probTab_ratio)
+    denom <- apply(probTab[,-c(1:2)],1,sum)
+    for(b in 1:B)  probTab[,c(2+b)] <- probTab[,c(2+b)]/denom
     ## M-Step -----------------------------------------------------------------
+    pred <- XLong %*% beta_init
+    sigma_hat <- list()
+    for(b in 1:B){
+      sigma_hat[[b]] <- list()
+      dd$resid <- dd$y - pred[,b]
+      tmp <- by(data = dd,INDICES = grp_rep,FUN = function(df){
+        by(df, df$rep, function(x){
+          out <- list()
+          i <- x$rep[1]
+          j <- x$group[1]
+          rr <- matrix(x$resid,ncol=1)
+          prb <- subset(probTab,subset = reps==i & grps==j)[,c(2+b)]
+          out[[1]] <- prb * (rr %*%t (rr))
+          out[[2]] <- prb
+          out
+        })
+      })
+      upr = lwr = 0
+      for(j in 1:J){
+        for(i in 1:I){
+          id <- subset(dd_order,rep==i&group==j)$id
+          upr <- upr + tmp[[id]][[1]]
+          lwr <- lwr + tmp[[id]][[2]]
+        } # end for i
+        sigma_hat[[b]][[j]] <- upr/lwr
+      } # end for j
+    } # end for b
+
     if(verbose) message("Optimizing...")
     if(optMethod=="bobyqa"){
       opt <- optimx::optimx(par = cp_in,
@@ -413,8 +423,10 @@ aggrmodel_cluster <- function(formula=NULL,
                             method = "bobyqa",
                             data = dd,
                             market = market,
+                            optWrap = optLk,
                             piPar = pi_init,
                             pTab = probTab,
+                            sCovList = sigma_hat,
                             B=B,
                             t=t,
                             K=n_basis,
@@ -435,8 +447,10 @@ aggrmodel_cluster <- function(formula=NULL,
                   method = "L-BFGS-B",
                   data = dd,
                   market = market,
+                  optWrap = optLk,
                   piPar = pi_init,
                   pTab = probTab,
+                  sCovList = sigma_hat,
                   B=B,
                   t=t,
                   K=n_basis,
@@ -499,13 +513,11 @@ aggrmodel_cluster <- function(formula=NULL,
                             })
     }
     probLong <- list()
-    probTab2 <- probTab[order(probTab$grps, probTab$reps),]
+    probTab2 <- probTab[order(probTab[,2], probTab[,1]),]
         for(b in 1:B){
           probLong[[b]] <- diag(rep(probTab2[,b+2],each=T))
         }
     ## COMPUTE BETAs ----
-    # XLong <- do.call(rbind,XList) ## pile by group
-    # XLong <- do.call(rbind, replicate(n=I,XLong, simplify = FALSE)) ## replicate piling
     beta_out <- beta_init ## initiate
     for(b in 1:B){
       tmpLeft <- t(XLong)%*%probLong[[b]]%*%
@@ -549,7 +561,26 @@ aggrmodel_cluster <- function(formula=NULL,
       } ## end if/else cicle
     }
     pi_out <- apply(probTab[,-c(1:2)],2,mean)
+    xbeta_out <- lapply(X, function(x)  x %*% beta_out)
+
     ## Check convergence & updates
+    # if(!optLk){
+    #   lk_part <- matrix(nrow=I*J,ncol=B)
+    #    for(b in 1:B){
+    #      tmp <- by(data = dd,INDICES = grp_rep,FUN = function(df){
+    #        j <- df$group[1]
+    #        i <- df$rep[1]
+    #        mvtnorm::dmvnorm(x = as.numeric(df$y),
+    #                         mean = as.numeric(c(xbeta_out[[j]][,b])),
+    #                         sigma = as.matrix(sigMtxList_out[[b]][[j]]),
+    #                         log=FALSE)
+    #      })
+    #      lk_part[,b] <- pi_out[b]*as.numeric(tmp)
+    #    }
+    #   lk <- as.numeric(apply(lk_part,1,sum))
+    #   lkOut <- sum(log(lk))
+    #   if(verbose) message("lk value:",lkOut)
+    # }
     lkDiff <- abs(lkIn - lkOut)
     beta_init <- beta_out
     pi_init <- matrix(pi_out,ncol=B)
@@ -564,6 +595,7 @@ aggrmodel_cluster <- function(formula=NULL,
   predListNames <- paste("cluster",1:B,sep='')
   colnames(predList) <- predListNames
   ddOut <- cbind(dd,predList)
+  probTab <- as.data.frame(probTab)
   colnames(probTab)[1:2] <- c('rep','group')
   ddOut <- merge(ddOut, probTab)
   ec <- ncol(ddOut)
@@ -575,7 +607,7 @@ aggrmodel_cluster <- function(formula=NULL,
   }
   ddOut$pred <- pred
   ddOut <- ddOut[,c(1:4,ncol(ddOut))]
-  ## Mean curves
+  ## Mean curves ----
   if(basisFunction=='B-Splines')
     basisObj = create.bspline.basis(range(t),
                                     nbasis = n_basis,
@@ -587,12 +619,24 @@ aggrmodel_cluster <- function(formula=NULL,
   tuni <- unique(t)
   basisMtx = predict(basisObj, tuni)
   basisMtx <- Matrix::bdiag(replicate(C,basisMtx,simplify = FALSE))
-  mc <- apply(beta_out,2,function(b) basisMtx%*%b)
-  mc <- do.call(rbind,mc)
+  betaSE <- matrix(nrow=nrow(beta_out),
+                   ncol=B)
+  for(b in 1:B){
+    sigmaum <- sigLongList[[b]]
+    betaMult <- solve(tmpLeft, t(XLong)%*% probLong[[b]])%*%solve(sigmaum)
+    betaSE[,b] <- sqrt(diag(betaMult%*%sigmaum%*%t(betaMult)))
+  }
+  beta_lwr <- beta_out - qnorm(.975)*betaSE
+  beta_upr <- beta_out + qnorm(.975)*betaSE
+  mc_lwr <- basisMtx %*% beta_lwr
+  mc_upr <- basisMtx %*% beta_upr
+  mc <- basisMtx%*%beta_out
   mc <- data.frame(cluster = rep(paste('cluster',1:B,sep=''),each=C*T),
                    type = rep(rep(unique(market$type),each=T),times=B),
                    time = rep(tuni,times=C*B),
-                   mc = as.numeric(mc))
+                   mc = mc@x,
+                   mc_lwr = mc_lwr@x,
+                   mc_upr = mc_upr@x)
   ## return -----
   outList <- list("probTab"=probTab,
                   "betaPar" = beta_out,
