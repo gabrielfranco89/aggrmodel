@@ -4,7 +4,7 @@
 \alias{plot.aggrmodel_cluster}
 \title{Plot mean curves of Aggregated Model with clusters}
 \usage{
-\method{plot}{aggrmodel_cluster}(object, scales = "fixed")
+\method{plot}{aggrmodel_cluster}(object, scales = "fixed", IC = TRUE)
 }
 \arguments{
 \item{object}{aggrmodel_cluster object}

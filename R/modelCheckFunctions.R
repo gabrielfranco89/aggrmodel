@@ -74,13 +74,16 @@ plotFitted <- function(object,
 #' n_cluster = 2,n_trials = 1000, n_order = 4, corType = 'periodic', verbose=TRUE)
 #'
 #' plot(fitCluster)
-plot.aggrmodel_cluster <- function(object,scales='fixed'){
-    require(ggplot2)
-    p <- object$mc %>%
-        ggplot(aes(x=time,y=mc)) +
-        geom_line() +
-        facet_grid(cluster~type, scales=scales)
-    p
+plot.aggrmodel_cluster <- function(object,scales='fixed',IC=TRUE){
+  require(ggplot2)
+  p <- object$mc %>%
+    ggplot(aes(x=time,y=mc)) +
+    geom_line()
+  if(IC) p <- p +
+    geom_line(aes(x=time, y=mc_lwr), linetype=2, alpha = .4)+
+    geom_line(aes(x=time, y=mc_upr), linetype=2, alpha = .4)
+  p + facet_grid(cluster~type, scales=scales)
+
 }
 
 #' Plot fitted values over observed values for an aggrmodel_cluster object
