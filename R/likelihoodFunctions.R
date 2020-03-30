@@ -170,7 +170,7 @@ loglikWrapper <- function(pars,
                                truncateDec = truncateDec)
     }
     if(covWrap == 'Homog'){
-        C <- length(unique(mktWrap[,2]))
+        C <- length(unlist(unique(mktWrap[,2])))
         cp <- pars[(C+1):(2*C)]
         if(positive) cp <- exp(cp)
         sigmaList <- covMatrix(market = mktWrap,
@@ -185,7 +185,7 @@ loglikWrapper <- function(pars,
                                truncateDec = truncateDec)
     }
     if(covWrap == 'Heterog'){
-        C <- length(unique(mktWrap[,2]))
+        C <- length(unlist(unique(mktWrap[,2])))
         tvec <- unique(dataWrap$time)
         basisObj = create.bspline.basis(range(tvec),
                                         nbasis = nBasisCov,

@@ -103,7 +103,7 @@ aggrmodel <- function(formula=NULL,
     J = length(unique(grps))
     I = length(unique(reps))
     T = length(unique(t))
-    C = length(unique(market[,2]))
+    C = length(unlist(unique(market[,2])))
     dd <- data.frame(group=as.integer(grps),
                      rep=as.integer(reps),
                      time=t,
@@ -389,7 +389,7 @@ aggrmodel <- function(formula=NULL,
                             mc_lwr = as.numeric(B %*% betaLwr),
                             mc_upr = as.numeric(B %*% betaUpr),
                             time=rep(tuni,times=C),
-                            type=rep(unique(market[,2]), each=length(tuni)))
+                            type=rep(unlist(unique(market[,2])), each=length(tuni)))
     }
     if(!is.null(timeVar2)){
         if(basisFunction=='B-Splines')

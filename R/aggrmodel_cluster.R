@@ -64,7 +64,7 @@ getClusterInitials <- function(data,
                                bFunc
                                ){
   ## Separate dataset in clusters
-  C <- length(unique(market[,2]))
+  C <- length(unlist(unique(market[,2])))
   J <- length(unique(data$group))
   smpObl <- rep(1:n_cluster, each=C)
   if((J-length(smpObl)) <0)
@@ -274,7 +274,7 @@ aggrmodel_cluster <- function(formula=NULL,
   J = length(unique(grps))
   I = length(unique(reps))
   T = length(unique(t))
-  C = length(unique(market[,2]))
+  C = length(unlist(unique(market[,2])))
   B = n_cluster
   K = n_basis
   dd <- data.frame(group=as.integer(grps),
@@ -321,7 +321,7 @@ aggrmodel_cluster <- function(formula=NULL,
   mktLong <- tidyr::spread(market,type,num)
   groupList <- subset(dd, select=c(group,rep))
   mktLong <- merge(groupList,mktLong)
-  mktList <- subset(mktLong, rep == reps[1])
+  mktList <- subset(mktLong, rep == as.integer(reps)[1])
   mktList <- subset(mktList, select = -rep)
   mktList <- split(mktList, mktList$group)
   X <- lapply(mktList, function(m){
