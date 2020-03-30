@@ -4,7 +4,7 @@
 \alias{plotFitted}
 \title{Plot fitted values over observed values}
 \usage{
-plotFitted(object, obsAlpha = 0.5, predColor = "magenta")
+plotFitted(object, obsAlpha = 0.5, predColor = "magenta", scales = "fixed")
 }
 \arguments{
 \item{object}{aggrmodel object fit}

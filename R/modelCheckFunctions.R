@@ -34,18 +34,19 @@ plot.aggrmodel <- function(object, scales = 'fixed', IC = TRUE){
 #' @export
 plotFitted <- function(object,
                        obsAlpha = .5,
-                       predColor = 'magenta'){
+                       predColor = 'magenta',
+                       scales = "fixed"){
     dd <- object$fitted
     if(is.null(object$mc$time2)){
     p <- dd %>% ggplot(aes(x=time,y=y, group=rep)) +
         geom_line(alpha=obsAlpha) +
         geom_line(aes(y=pred), col=predColor) +
-        facet_wrap(.~group)
+        facet_wrap(.~group, scales=scales)
     }else{
     p <- dd %>% ggplot(aes(x=time,y=y, group=rep)) +
         geom_line(alpha=obsAlpha) +
         geom_line(aes(y=pred,col=time2)) +
-        facet_wrap(.~group)
+        facet_wrap(.~group,scales=scales)
     }
     p
 }
