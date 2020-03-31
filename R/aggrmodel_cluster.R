@@ -210,6 +210,10 @@ getClusterInitials <- function(data,
 #' @param itMax Number of maximum iterations of EM algorithm (Default: 100)
 #' @param verbose TRUE/FALSE indicating if steps of optimization should be printed as messages (Default: FALSE)
 #' @param cicleRep Indicator TRUE/FALSE if replicates are cyclical
+#' @param optMethod
+#' @param returnPred
+#' @param optLk
+#' @param corPar_init
 #'
 #' @return An aggrmodel_cluster object
 #'
@@ -248,6 +252,7 @@ aggrmodel_cluster <- function(formula=NULL,
                               covType = 'Homog_Uniform',
                               corType = 'exponential',
                               optMethod = "L-BFGS-B",
+                              returnPred = FALSE,
                               optLk = TRUE,
                               corPar_init = NULL,
                               diffTol = 1e-6,
@@ -642,8 +647,8 @@ aggrmodel_cluster <- function(formula=NULL,
                   "betaPar" = beta_out,
                   "piPar" = pi_out[-c(1:2)],
                   "covPar" = covPar,
-                  'predData' = ddOut,
                   'mc' = mc)
+  if(returnPred) outList[['predData']] <- ddOut
   class(outList)='aggrmodel_cluster'
   outList
 }

@@ -22,6 +22,7 @@ aggrmodel_cluster(
   covType = "Homog_Uniform",
   corType = "exponential",
   optMethod = "L-BFGS-B",
+  returnPred = FALSE,
   optLk = TRUE,
   corPar_init = NULL,
   diffTol = 1e-06,
@@ -61,6 +62,8 @@ aggrmodel_cluster(
 \item{covType}{Covariance functional type. One of "Homog_Uniform" (default), "Homog" or "Heterog"}
 
 \item{corType}{Correlation structure type. One of "periodic" (default) or "exponential"}
+
+\item{corPar_init}{}
 
 \item{diffTol}{Tolerance of model covergence (Default: 1e-06)}
 
