@@ -340,7 +340,6 @@ aggrmodel_cluster <- function(formula=NULL,
                    timeVec = t,n_basis = K,
                    basis = basisFunction,n_order = n_order)
 
-
   while(lkDiff > diffTol & n_it < itMax){
     if(verbose)
       message(paste("\nIteration num ",n_it))
@@ -392,34 +391,37 @@ aggrmodel_cluster <- function(formula=NULL,
     denom <- apply(probTab[,-c(1:2)],1,sum)
     for(b in 1:B)  probTab[,c(2+b)] <- probTab[,c(2+b)]/denom
     ## M-Step -----------------------------------------------------------------
-    pred <- XLong %*% beta_init
-    sigma_hat <- list()
-    for(b in 1:B){
-      sigma_hat[[b]] <- list()
-      dd$resid <- dd$y - pred[,b]
-      tmp <- by(data = dd,INDICES = grp_rep,FUN = function(df){
-        by(df, df$rep, function(x){
-          out <- list()
-          i <- x$rep[1]
-          j <- x$group[1]
-          rr <- matrix(x$resid,ncol=1)
-          prb <- subset(probTab,subset = reps==i & grps==j)[,c(2+b)]
-          out[[1]] <- prb * (rr %*%t (rr))
-          out[[2]] <- prb
-          out
+    if(optLk){
+      sigma_hat = NULL
+    } else{
+      pred <- XLong %*% beta_init
+      sigma_hat <- list()
+      for(b in 1:B){
+        sigma_hat[[b]] <- list()
+        dd$resid <- dd$y - pred[,b]
+        tmp <- by(data = dd,INDICES = grp_rep,FUN = function(df){
+          by(df, df$rep, function(x){
+            out <- list()
+            i <- x$rep[1]
+            j <- x$group[1]
+            rr <- matrix(x$resid,ncol=1)
+            prb <- subset(probTab,subset = reps==i & grps==j)[,c(2+b)]
+            out[[1]] <- prb * (rr %*%t (rr))
+            out[[2]] <- prb
+            out
+          })
         })
-      })
-      upr = lwr = 0
-      for(j in 1:J){
-        for(i in 1:I){
-          id <- subset(dd_order,rep==i&group==j)$id
-          upr <- upr + tmp[[id]][[1]]
-          lwr <- lwr + tmp[[id]][[2]]
-        } # end for i
-        sigma_hat[[b]][[j]] <- upr/lwr
-      } # end for j
-    } # end for b
-
+        upr = lwr = 0
+        for(j in 1:J){
+          for(i in 1:I){
+            id <- subset(dd_order,rep==i&group==j)$id
+            upr <- upr + tmp[[id]][[1]]
+            lwr <- lwr + tmp[[id]][[2]]
+          } # end for i
+          sigma_hat[[b]][[j]] <- upr/lwr
+        } # end for j
+      } # end for b
+    } # end if optLk
     if(verbose) message("Optimizing...")
     if(optMethod=="bobyqa"){
       opt <- optimx::optimx(par = cp_in,
@@ -491,12 +493,12 @@ aggrmodel_cluster <- function(formula=NULL,
                          truncateDec = 8)
         sig
       })
-      sigLongList <- lapply(sigMtxList_out,
-                            function(m){
-                              mtx <- lapply(m,function(x) Matrix::bdiag(replicate(n=I,x,simplify=FALSE)))
-                              mtx <- Matrix::bdiag(mtx)
-                              mtx
-                            })
+      # sigLongList <- lapply(sigMtxList_out,
+      #                       function(m){
+      #                         mtx <- lapply(m,function(x) Matrix::bdiag(replicate(n=I,x,simplify=FALSE)))
+      #                         mtx <- Matrix::bdiag(mtx)
+      #                         mtx
+      #                       })
     }
     if(covType=='Homog'){
       covPar <- matrix(cp_out, ncol=B,byrow=TRUE)
@@ -510,25 +512,47 @@ aggrmodel_cluster <- function(formula=NULL,
                          truncateDec = 8)
         sig
       })
-      sigLongList <- lapply(sigMtxList_out,
-                            function(m){
-                              mtx <- lapply(m,function(x) Matrix::bdiag(replicate(n=I,x,simplify=FALSE)))
-                              mtx <- Matrix::bdiag(mtx)
-                              mtx
-                            })
+      # sigLongList <- lapply(sigMtxList_out,
+      #                       function(m){
+      #                         mtx <- lapply(m,function(x) Matrix::bdiag(replicate(n=I,x,simplify=FALSE)))
+      #                         mtx <- Matrix::bdiag(mtx)
+      #                         mtx
+      #                       })
     }
-    probLong <- list()
-    probTab2 <- probTab[order(probTab[,2], probTab[,1]),]
-        for(b in 1:B){
-          probLong[[b]] <- diag(rep(probTab2[,b+2],each=T))
-        }
+    # probLong <- list()
+    # probTab2 <- probTab[order(probTab[,2], probTab[,1]),]
+    #     for(b in 1:B){
+    #       probLong[[b]] <- diag(rep(probTab2[,b+2],each=T))
+    #     }
     ## COMPUTE BETAs ----
-    beta_out <- beta_init ## initiate
+    betaSE <- beta_out <- beta_init ## initiate
     for(b in 1:B){
-      tmpLeft <- t(XLong)%*%probLong[[b]]%*%
-        Matrix::solve(sigLongList[[b]],XLong)
-      tmpRight <- t(XLong)%*%probLong[[b]]%*%
-        Matrix::solve(sigLongList[[b]],matrix(y,ncol=1))
+      sigInvList <- lapply(sigMtxList_out[[b]], solve)
+      tmpLeft <- matrix(0,nrow=nrow(beta_out),ncol=nrow(beta_out))
+      tmpRight <- matrix(0,nrow=nrow(beta_out),ncol=1)
+      se <- tmpLeft
+      for(j in 1:J){
+        x_sinv <- t(X[[j]]) %*% sigInvList[[j]]
+        mainLeft <- x_sinv %*%  X[[j]]
+        for(i in 1:I){
+          pijb <- subset(probTab,subset = reps==i & grps==j)[,c(2+b)]
+          yij <- matrix( dd[dd$group==j&dd$rep==i,"y"], ncol=1)
+          tmpLeft <- tmpLeft + pijb*mainLeft
+          tmpRight <- tmpRight + pijb*(x_sinv %*% yij)
+
+          bij <- pijb*x_sinv
+          se <- se + bij %*% sigMtxList_out[[b]][[j]]%*% t(bij)
+
+      # tmpLeft <- t(XLong)%*%probLong[[b]]%*%
+      #   Matrix::solve(sigLongList[[b]],XLong)
+      # tmpRight <- t(XLong)%*%probLong[[b]]%*%
+      #   Matrix::solve(sigLongList[[b]],matrix(y,ncol=1))
+
+        } # end for i
+      } # end for j
+      inv_tl <- solve(tmpLeft)
+      se <- inv_tl %*% se %*% t(inv_tl)
+      betaSE[,b] <- sqrt(diag(se))
       if(cicleRep){
         ## Note: Here we use a(0) = a(T) restriction
         if(basisFunction=='B-Splines')
@@ -560,9 +584,9 @@ aggrmodel_cluster <- function(formula=NULL,
           lambda[1,c] <- lUp/lDown
         }
         Rvec <- lambda %x% deltaVec
-        beta_out[,b] <- as.numeric(Matrix::solve(tmpLeft, (tmpRight - t(Rvec))))
+        beta_out[,b] <- as.numeric(solve(tmpLeft, (tmpRight - t(Rvec))))
       } else {
-        beta_out[,b] <- as.numeric(Matrix::solve(tmpLeft,tmpRight))
+        beta_out[,b] <- as.numeric(solve(tmpLeft,tmpRight))
       } ## end if/else cicle
     }
     pi_out <- apply(probTab[,-c(1:2)],2,mean)
@@ -624,13 +648,13 @@ aggrmodel_cluster <- function(formula=NULL,
   tuni <- unique(t)
   basisMtx = predict(basisObj, tuni)
   basisMtx <- Matrix::bdiag(replicate(C,basisMtx,simplify = FALSE))
-  betaSE <- matrix(nrow=nrow(beta_out),
-                   ncol=B)
-  for(b in 1:B){
-    sigmaum <- sigLongList[[b]]
-    betaMult <- solve(tmpLeft, t(XLong)%*% probLong[[b]])%*%solve(sigmaum)
-    betaSE[,b] <- sqrt(diag(betaMult%*%sigmaum%*%t(betaMult)))
-  }
+  # betaSE <- matrix(nrow=nrow(beta_out),
+  #                  ncol=B)
+  # for(b in 1:B){
+  #   sigmaum <- sigLongList[[b]]
+  #   betaMult <- solve(tmpLeft, t(XLong)%*% probLong[[b]])%*%solve(sigmaum)
+  #   betaSE[,b] <- sqrt(diag(betaMult%*%sigmaum%*%t(betaMult)))
+  # }
   beta_lwr <- beta_out - qnorm(.975)*betaSE
   beta_upr <- beta_out + qnorm(.975)*betaSE
   mc_lwr <- basisMtx %*% beta_lwr
