@@ -444,7 +444,8 @@ aggrmodel_cluster <- function(formula=NULL,
                             basisFunction=basisFunction,
                             n_order=n_order,
                             covWrap=covType,
-                            corWrap=corType
+                            corWrap=corType,
+                            hessian = TRUE
       )
     }
     else{
@@ -468,7 +469,8 @@ aggrmodel_cluster <- function(formula=NULL,
                   basisFunction=basisFunction,
                   n_order=n_order,
                   covWrap=covType,
-                  corWrap=corType
+                  corWrap=corType,
+                  hessian = TRUE
       )
     }
     lkOut <- opt$value
@@ -669,8 +671,10 @@ aggrmodel_cluster <- function(formula=NULL,
   ## return -----
   outList <- list("probTab"=probTab,
                   "betaPar" = beta_out,
+                  "betaSE" = betaSE,
                   "piPar" = pi_out[-c(1:2)],
                   "covPar" = covPar,
+                  "covParSE" = sqrt(diag(solve(opt$hessian))),
                   'mc' = mc)
   if(returnPred) outList[['predData']] <- ddOut
   class(outList)='aggrmodel_cluster'
