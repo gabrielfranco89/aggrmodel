@@ -145,14 +145,14 @@ createVarMtx <- function(functionalVec,
 #'                  type = rep(1:2, times = 3),
 #'                  value = sample(1:20, 6))
 #'
-#' myTimevec = seq(0,1, length.out = 4)
+#' myTimevec = seq(0,1, length.out = 12)
 #' mySigPar = matrix(c(2,3), ncol=2)
 #' myTauPar = matrix(c(.2, .2), ncol=2)
-#' myCorPar = matrix(c(8, 12), ncol=2)
+#' myCorPar = matrix(c(1/8, 12), ncol=2)
 #' myFuncMtx = matrix(runif(8), nrow = 4, ncol=2)
 #'
 #' ## Homogeneous example
-#' homogMtx = covMatrix(market = mkt, group.name = 'group', type.name = 'type', mkt.name = 'value', timeVec = myTimevec, sigPar = mySigPar, tauPar = myTauPar, corPar = myCorPar, covType = 'Homog', corType = 'periodic')
+#' homogMtx = covMatrix(market = mkt, group.name = 'group', type.name = 'type', mkt.name = 'value', timeVec = myTimevec, sigPar = mySigPar, tauPar = myTauPar, corPar = myCorPar, covType = 'Homog', corType = 'exponential')
 #' @export
 #'
 #' @import Matrix
