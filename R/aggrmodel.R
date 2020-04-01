@@ -117,7 +117,9 @@ aggrmodel <- function(formula=NULL,
                                       levels=levels(grps)))
     ## Build disagragation basis expansion design matrix
     mktLong <- tidyr::spread(market,type,num)
-    groupList <- subset(dd, select=c(group))
+    grouprep <- subset(dd, select=c(group,rep))
+    grouprep$flag <- rep(1:c(I*J), each=T)
+    groupList <- subset(grouprep, select=group)
     mktLong <- merge(groupList,mktLong)
     X <- buildX(market=mktLong,
                     nType = C,
@@ -143,6 +145,8 @@ aggrmodel <- function(formula=NULL,
                             select=-c(rep,group,time)))
         X <- as.matrix(X)
     } ## end if is.null(formula)
+    XList <- split(X, grouprep$flag)
+    XList <- lapply(XList, matrix, nrow=T)
     ## Get initial values -------------------------------------
     init <- get_inits(X=X, I=I,
                       data = dd,
@@ -181,19 +185,24 @@ aggrmodel <- function(formula=NULL,
             lowerBoundVec <- rep(-Inf, pLen)
             upperBoundVec <- rep(Inf, pLen)
         }
-        dd$resid <- dd$y - as.numeric(X %*% betaIn)
-        residList <- by(dd, INDICES = dd$group,FUN = function(x){
-            by(x, x$rep, function(d){
-                rr <- matrix(d$resid, ncol=1)
-                rr %*% t(rr)
+        if(!optSampleCovMatrix){
+            residListGroup <- NULL
+        } else {
+            dd$resid <- dd$y - as.numeric(X %*% betaIn)
+            residList <- by(dd, INDICES = dd$group,FUN = function(x){
+                by(x, x$rep, function(d){
+                    rr <- matrix(d$resid, ncol=1)
+                    rr %*% t(rr)
+                })
             })
-        })
-        residListGroup <- lapply(residList, function(x){
-            nRep <- length(x)
-            Reduce("+",x) / (nRep - 1)
-        }
-        )
-        rm(residList)
+            residListGroup <- lapply(residList, function(x){
+                nRep <- length(x)
+                Reduce("+",x) / (nRep - 1)
+            }
+            )
+            rm(residList)
+        } # end if optSCovMatrix
+
         opt <- optim(par = parIn,
                      fn = loglikWrapper,
                      gr = gradLK,
@@ -286,15 +295,32 @@ aggrmodel <- function(formula=NULL,
                                           truncateDec = truncateDec)
             }
             ## W.3 Obtain beta estimates with previous steps
-            sigmaInvList <- lapply(sigmaOutList, qr.solve)
-            sigmaInv <- lapply(sigmaInvList, function(x)
-                bdiag(replicate(n=I,
-                                expr=x,
-                                simplify=FALSE))
-            )
-            sigmaInv <- bdiag(sigmaInv)
-            betaLeft <- t(X)%*%sigmaInv%*%X
-            betaRight <- t(X)%*%sigmaInv%*%y
+            gr1 <- unique(grouprep)
+            sigmaInvList <- lapply(sigmaOutList, solve)
+            betaLeft <- matrix(0,nrow=ncol(X),ncol=ncol(X))
+            betaRight <- matrix(0,nrow=ncol(X),ncol=1)
+            se <- betaLeft
+            for(k in unique(gr1$flag)){
+                i <- gr1[gr1$flag==k,"rep"]
+                j <- gr1[gr1$flag==k,"group"]
+                x_sinv <- t(XList[[k]]) %*% sigmaInvList[[j]]
+                mainLeft <- x_sinv %*%  XList[[k]]
+                yij <- matrix( dd[dd$group==j&dd$rep==i,"y"], ncol=1)
+                betaLeft <- betaLeft + mainLeft
+                betaRight <- betaRight + x_sinv %*% yij
+                se <- se + x_sinv %*% sigmaOutList[[j]]%*% t(x_sinv)
+            }
+            inv_tl <- solve(betaLeft)
+            se <- inv_tl %*% se %*% t(inv_tl)
+            betaSE <- sqrt(diag(se))
+            # sigmaInv <- lapply(sigmaInvList, function(x)
+            #     bdiag(replicate(n=I,
+            #                     expr=x,
+            #                     simplify=FALSE))
+            # )
+            # sigmaInv <- bdiag(sigmaInv)
+            # betaLeft <- t(X)%*%sigmaInv%*%X
+            # betaRight <- t(X)%*%sigmaInv%*%y
             if(cicleRep){
                 ## Note: Here we use a(0) = a(T) restriction
                 if(basisFunction=='B-Splines')
@@ -309,7 +335,7 @@ aggrmodel <- function(formula=NULL,
                 deltaVec <- matrix(B[1,] - B[nrow(B),],nrow=1)
                 ## Get lambdas
                 ## I can vectorize later (maybe)
-                m1List <- split(x=qr.solve(betaLeft),
+                m1List <- split(x=solve(betaLeft),
                                 f=rep(1:C, each=n_basis))
                 m2List <- split(x=betaRight,
                                 f=rep(1:C, each=n_basis))
@@ -326,9 +352,9 @@ aggrmodel <- function(formula=NULL,
                     lambda[1,c] <- lUp/lDown
                 }
                 Rvec <- lambda %x% deltaVec
-                betaOut <- Matrix::solve(betaLeft, (betaRight - t(Rvec)))
+                betaOut <- solve(betaLeft, (betaRight - t(Rvec)))
             } else {
-                betaOut <- Matrix::solve(betaLeft, betaRight)
+                betaOut <- solve(betaLeft, betaRight)
             } ## end if/else cicle
         } ## end if !positive_restriction
         ## W.4 UPDATES ----
@@ -358,15 +384,15 @@ aggrmodel <- function(formula=NULL,
     } ## End while(lkDiff > diffTol)
 
     ## Output ----------------------
-    ## Beta Std Error ----
-    sigmaum <- lapply(sigmaOutList, function(x)
-        bdiag(replicate(n=I,
-                        expr=x,
-                        simplify=FALSE))
-    )
-    sigmaum <- bdiag(sigmaum)
-    betaMult <- solve(t(X)%*%sigmaInv%*%X) %*% t(X)%*%sigmaInv
-    betaSE <- sqrt(diag(betaMult%*%sigmaum%*%t(betaMult)))
+    # ## Beta Std Error ----
+    # sigmaum <- lapply(sigmaOutList, function(x)
+    #     bdiag(replicate(n=I,
+    #                     expr=x,
+    #                     simplify=FALSE))
+    # )
+    # sigmaum <- bdiag(sigmaum)
+    # betaMult <- solve(t(X)%*%sigmaInv%*%X) %*% t(X)%*%sigmaInv
+    # betaSE <- sqrt(diag(betaMult%*%sigmaum%*%t(betaMult)))
     ## Mean curves ----
     if(is.null(timeVar2)){
         if(basisFunction=='B-Splines')
@@ -379,15 +405,17 @@ aggrmodel <- function(formula=NULL,
         }
         tuni <- unique(t)
         B = predict(basisObj, tuni)
-        B <- Matrix::bdiag(replicate(n=C,B,simplify = FALSE))
         ## Separate betas
         betaMC <- betaOut[1:(C*n_basis)]
         betaMC_SE <- betaSE[1:(C*n_basis)]
         betaLwr <- betaMC - qnorm(.975)*betaMC_SE
         betaUpr <- betaMC + qnorm(.975)*betaMC_SE
-        mcMtx <- data.frame(mc= as.numeric(B %*% betaMC),# unlist(mcMtx),
-                            mc_lwr = as.numeric(B %*% betaLwr),
-                            mc_upr = as.numeric(B %*% betaUpr),
+        mc <- B %*% matrix(betaMC, ncol=C)
+        mc_lwr <- B %*% matrix(betaLwr, ncol=C)
+        mc_upr <- B %*% matrix(betaUpr, ncol=C)
+        mcMtx <- data.frame(mc= as.numeric(mc),# unlist(mcMtx),
+                            mc_lwr = as.numeric(mc_lwr),
+                            mc_upr = as.numeric(mc_upr),
                             time=rep(tuni,times=C),
                             type=rep(unlist(unique(market[,2])), each=length(tuni)))
     }
@@ -448,7 +476,7 @@ aggrmodel <- function(formula=NULL,
     ## Return ----
     outList <- list('beta' = as.matrix(betaOut),
                 'pars' = parOut,
-                'parsSE' = sqrt(diag(opt$hessian)),
+                'parsSE' = sqrt(diag(solve(opt$hessian))),
                 'mc' = mcMtx,
                 'n_basis' = n_basis,
                 'n_order' = n_order,
