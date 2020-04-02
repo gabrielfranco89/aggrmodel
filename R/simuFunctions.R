@@ -62,6 +62,7 @@ createSimuData <- function(B1 = 4,
     }# end if/else market is null
 
     ## READ MEAN CURVES AND TEMPERATURES
+    data("simulatedMeanCurves", package="aggrmodel")
     mc <- simulatedMeanCurves
     mc$Type <- rep(1:3,each=48)
     mc$Time2 <- mc$Time/24
@@ -181,6 +182,7 @@ createSimuData <- function(B1 = 4,
     attr(dd,"tempPar") = tempPar
     attr(dd,"seed") = ifelse(is.null(seed), "Not specified", seed )
     attr(dd,"market") = mkt
+    attr(dd,"nu") = cbind(c(nu1),c(nu2))
     dd
 }
 
