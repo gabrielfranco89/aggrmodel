@@ -101,11 +101,11 @@ logLikelihood <- function(data,
                 INDICES = data$flag,
                 FUN = function(dt){
                     jj <- dt$group[1]
-                    actualMu <- dt$mu
-                    actualSigma <- covMtxList[[jj]]
+                    # actualMu <- dt$mu
+                    # actualSigma <- covMtxList[[jj]]
                     mvtnorm::dmvnorm(x = dt$y,
-                                     mean = actualMu,
-                                     sigma = actualSigma,
+                                     mean = dt$mu,
+                                     sigma = covMtxList[[jj]],
                                      log = TRUE)
                 })
     -sum(unlist(lk))
@@ -193,13 +193,13 @@ loglikWrapper <- function(pars,
         B <- predict(basisObj, tvec)
         betaMC <- pars[1:(C*nBasisCov)]
         funcVarIn <- B %*% matrix(betaMC, ncol=3)
-        funcVarIn <- exp(funcVarIn)
-        sigParIn <- pars[(C*nBasisCov+1):(length(pars)-(2*C))]
-        corParIn <- pars[(C*nBasisCov+C+1):(length(pars)-C)]
-        tauParIn  <- pars[((length(pars)-C+1):length(pars))]
+        # funcVarIn <- exp(funcVarIn)
+        # sigParIn <- pars[(C*nBasisCov+1):(length(pars)-(2*C))]
+        corParIn <- pars[(C*nBasisCov+1):length(pars)]
+        # tauParIn  <- pars[((length(pars)-C+1):length(pars))]
         if(positive){
         corParIn <- exp(corParIn)
-        tauParIn <- exp(tauParIn)
+        # tauParIn <- exp(tauParIn)
         }
         sigmaList <- covMatrix(market = mktWrap,
                                group.name = 'Group',
@@ -207,9 +207,9 @@ loglikWrapper <- function(pars,
                                mkt.name = 'mkt',
                                timeVec = dataWrap$time,
                                funcMtx = funcVarIn,
-                               sigPar = sigParIn,
+                               sigPar = rep(1,C), #sigParIn,
                                corPar = corParIn,
-                               tauPar = tauParIn,
+                               tauPar = rep(1,C), #tauParIn,
                                covType = 'Heterog',
                                corType = corWrap,
                                truncateDec = truncateDec)
@@ -223,9 +223,9 @@ loglikWrapper <- function(pars,
         if(all(verbWrap & covWrap=='Heterog'))
             message("\n norm =", round(normFrob,6),
                     "\n mean(betaPar) =", paste(round(betaMC,4),collapse=','),
-                    "\n sigPar =", paste(round(sigParIn,4), collapse=','),
-                    "\n corPar =", paste(round(corParIn,4), collapse=','),
-                    "\n tauPar =", paste(round(tauParIn,4), collapse=',')
+                    # "\n sigPar =", paste(round(sigParIn,4), collapse=','),
+                    "\n corPar =", paste(round(corParIn,4), collapse=',')
+                    # "\n tauPar =", paste(round(tauParIn,4), collapse=',')
             )
         if(all(verbWrap & !covWrap=='Heterog'))
             message("\n lk =", round(normFrob,6),
@@ -248,9 +248,9 @@ loglikWrapper <- function(pars,
                     "\n mean(betaPar) =", paste(round(apply(funcVarIn,2,mean),
                                                       4),
                                                 collapse=','),
-                    "\n mean(sigPar) =", paste(round(sigParIn,4), collapse=','),
-                    "\n corPar =", paste(round(corParIn,4), collapse=','),
-                    "\n tauPar =", paste(round(tauParIn,4), collapse=',')
+                    # "\n mean(sigPar) =", paste(round(sigParIn,4), collapse=','),
+                    "\n corPar =", paste(round(corParIn,4), collapse=',')
+                    # "\n tauPar =", paste(round(tauParIn,4), collapse=',')
             )
         if(all(verbWrap & !covWrap=='Heterog'))
             message("\n lk =", round(lk,6),
