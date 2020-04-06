@@ -490,7 +490,7 @@ aggrmodel <- function(formula=NULL,
     if(optSampleCovMatrix) outList[["normValues"]] <- normVec
     if(!is.null(formula))
         outList[['formula']] <- formula
-    if(covType=='Heterog')
+    if(covType=='Heterog'){
         tvec <- unique(dd$time)
         basisObj = create.bspline.basis(range(tvec),
                                         nbasis = n_basis_cov,
@@ -506,6 +506,7 @@ aggrmodel <- function(formula=NULL,
                             time = rep(tvec,times=C)
         )
         outList[["covCurves"]] <- ddCov
+    }
     class(outList)='aggrmodel'
     return(outList)
 }
