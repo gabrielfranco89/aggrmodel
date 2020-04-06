@@ -138,8 +138,8 @@ aggrmodel <- function(formula=NULL,
                          rep=reps,
                          time=dd$time
                          )
-        cvtMtx <- cvtMtx[order(cvtMtx[['rep']],
-                                 cvtMtx[['group']],
+        cvtMtx <- cvtMtx[order(cvtMtx[['group']],
+                                 cvtMtx[['rep']],
                                  cvtMtx[['time']]),]
         X <- cbind(X,subset(cvtMtx,
                             select=-c(rep,group,time)))
