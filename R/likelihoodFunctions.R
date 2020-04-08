@@ -89,7 +89,7 @@ buildX <- function(marketLong,
 #' @param covMtxList List of covariance matrices for each group
 #'
 #' @return Log-likehood value
-#' @importFrom mvtnorm dmvnorm
+#' @importFrom mvnfast dmvn
 #' @export
 logLikelihood <- function(data,
                           muVec,
@@ -97,16 +97,18 @@ logLikelihood <- function(data,
     data$flag <- as.factor(paste(data$rep,data$group))
     data$flag <- as.integer(data$flag)
     data$mu <- muVec
+    cholSig <- lapply(covMtxList, chol)
     lk <- by(data = data,
                 INDICES = data$flag,
                 FUN = function(dt){
                     jj <- dt$group[1]
-                    # actualMu <- dt$mu
-                    # actualSigma <- covMtxList[[jj]]
-                    mvtnorm::dmvnorm(x = dt$y,
-                                     mean = dt$mu,
-                                     sigma = covMtxList[[jj]],
-                                     log = TRUE)
+                    actualMu <- dt$mu
+                    actualSigma <- covMtxList[[jj]]
+                    mvnfast::dmvn(X = dt$y,
+                                  mu = dt$mu,
+                                  sigma = cholSig[[jj]],
+                                  isChol=TRUE,
+                                  log=TRUE)
                 })
     -sum(unlist(lk))
 }
@@ -192,7 +194,7 @@ loglikWrapper <- function(pars,
                                         norder = nOrderCov)
         B <- predict(basisObj, tvec)
         betaMC <- pars[1:(C*nBasisCov)]
-        funcVarIn <- B %*% matrix(betaMC, ncol=3)
+        funcVarIn <- B %*% matrix(betaMC, ncol=C)
         # funcVarIn <- exp(funcVarIn)
         # sigParIn <- pars[(C*nBasisCov+1):(length(pars)-(2*C))]
         corParIn <- pars[(C*nBasisCov+1):length(pars)]
@@ -321,26 +323,24 @@ gradLK <- function(x, dataWrap,mktWrap,sCovWrap,covWrap,corWrap,betaWrap,
 #'
 #' @return A scalar likelihood value
 #' @export
-#' @importFrom mvtnorm dmvnorm
+#' @importFrom mvnfast dmvn
 Q_function <- function(data,sigmaList,xbetaList,probTab,B){
     logLikOut=0
+    cholList <- lapply(sigmaList, function(x) lapply(x,chol))
     for(j in unique(data$group)){
         for(i in unique(data$rep)){
-            yij <- data[data$group==j&data$rep==i,"y"]
-            for(b in 1:B){
-                xbeta_jb <- xbetaList[[j]][,b]
-                prob_ijb <- probTab[probTab$grps==j&probTab$reps==i,b+2]
+             for(b in 1:B){
+                 prob_ijb <- probTab[probTab$grps==j&probTab$reps==i,b+2]
                 prob_ijb <- as.numeric(prob_ijb)
-                sigma_jb <- as.matrix(sigmaList[[b]][[j]])
-                logLikOut <- logLikOut +
-                    prob_ijb* mvtnorm::dmvnorm(x=yij,
-                                                    mean = xbeta_jb,
-                                                    sigma= sigma_jb,
-                                                    log = TRUE)
+                 logLikOut <- logLikOut +
+                  prob_ijb* mvnfast::dmvn(X =data[data$group==j&data$rep==i,"y"],
+                                          mu =  xbetaList[[j]][,b],
+                                          sigma =as.matrix(cholList[[b]][[j]]),
+                                          isChol=TRUE,
+                                          log=TRUE)
             } # end for b
         } # end for i
     } # end for j
-    # message(paste('',round(-logLikOut,6)))
     -logLikOut ## minus for maximization
 }
 
