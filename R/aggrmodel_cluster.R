@@ -674,7 +674,7 @@ aggrmodel_cluster <- function(formula=NULL,
                   "betaSE" = betaSE,
                   "piPar" = pi_out[-c(1:2)],
                   "covPar" = covPar,
-                  "covParSE" = sqrt(diag(solve(opt$hessian))),
+                  "covParSE" = tryCatch(sqrt(diag(solve(opt$hessian))), error=function(e) e),
                   'mc' = mc)
   if(returnPred) outList[['predData']] <- ddOut
   class(outList)='aggrmodel_cluster'
