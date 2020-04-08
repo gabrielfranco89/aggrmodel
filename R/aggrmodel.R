@@ -240,6 +240,8 @@ aggrmodel <- function(formula=NULL,
                  parOut[(C*n_basis_cov+1):(length(parOut))] <- log( parOut[(C*n_basis_cov+1):(length(parOut))])
                  # parOut[((length(parOut)-C+1):length(parOut))] <- log( parOut[((length(parOut)-C+1):length(parOut))])
             }
+            parsSE <-  tryCatch(sqrt(abs(diag(solve(opt$hessian)))),error=function(e) e )
+            betaSE <- parsSE[1:nCoef]
         }
         if(!positive_restriction){
             if(covType == 'Homog_Uniform'){
@@ -334,27 +336,32 @@ aggrmodel <- function(formula=NULL,
                                                     nbasis = n_basis)
                 }
                 B = predict(basisObj, t)
-                deltaVec <- matrix(B[1,] - B[nrow(B),],nrow=1)
+                Rvec <- matrix(B[1,] - B[nrow(B),],nrow=1)
+                Rvec <- matrix(1,ncol=C) %x% Rvec
+                if(!is.null(formula)) Rvec <- cbind(Rvec, matrix(0,ncol=c(ncol(X) - C*n_basis)))
+                lambda <- solve(betaLeft, betaRight)
+                lambda <- (Rvec %*% lambda) / (Rvec%*%t(Rvec))
+                lambda <- as.numeric(lambda)
                 ## Get lambdas
-                ## I can vectorize later (maybe)
-                m1List <- split(x=solve(betaLeft),
-                                f=rep(1:C, each=n_basis))
-                m2List <- split(x=betaRight,
-                                f=rep(1:C, each=n_basis))
-                lambda <- matrix(numeric(C),nrow=1)
-                for(c in 1:C){
-                    lUp <- deltaVec%*%
-                        matrix(m1List[[c]],
-                               nrow=n_basis)[,(n_basis*(c-1)+1):(c*n_basis)]%*%
-                        matrix(m2List[[c]],ncol=1)
-                    lDown <- deltaVec%*%
-                        matrix(m1List[[c]],
-                               nrow=n_basis)[,(n_basis*(c-1)+1):(c*n_basis)]%*%
-                        t(deltaVec)
-                    lambda[1,c] <- lUp/lDown
-                }
-                Rvec <- lambda %x% deltaVec
-                betaOut <- solve(betaLeft, (betaRight - t(Rvec)))
+                # ## I can vectorize later (maybe)
+                # m1List <- split(x=solve(betaLeft),
+                #                 f=rep(1:C, each=n_basis))
+                # m2List <- split(x=betaRight,
+                #                 f=rep(1:C, each=n_basis))
+                # lambda <- matrix(numeric(C),nrow=1)
+                # for(c in 1:C){
+                #     lUp <- deltaVec%*%
+                #         matrix(m1List[[c]],
+                #                nrow=n_basis)[,(n_basis*(c-1)+1):(c*n_basis)]%*%
+                #         matrix(m2List[[c]],ncol=1)
+                #     lDown <- deltaVec%*%
+                #         matrix(m1List[[c]],
+                #                nrow=n_basis)[,(n_basis*(c-1)+1):(c*n_basis)]%*%
+                #         t(deltaVec)
+                #     lambda[1,c] <- lUp/lDown
+                # }
+                # Rvec <- lambda %x% deltaVec
+                betaOut <- solve(betaLeft, (betaRight - lambda*t(Rvec)))
             } else {
                 betaOut <- solve(betaLeft, betaRight)
             } ## end if/else cicle
@@ -379,6 +386,7 @@ aggrmodel <- function(formula=NULL,
         }
         lkVec[itCount] <- lkValue
         lkDiff <- abs(lkOut - lkIn)
+        #if(positive_restriction) lkDiff = 0
         lkIn <- lkOut
         itCount <- itCount + 1
         if(itCount == itMax)
@@ -420,6 +428,9 @@ aggrmodel <- function(formula=NULL,
                             mc_upr = as.numeric(mc_upr),
                             time=rep(tuni,times=C),
                             type=rep(unlist(unique(market[,2])), each=length(tuni)))
+        if(positive_restriction){
+          mcMtx[,1:3] <- exp(mcMtx[,1:3])
+        }
     }
     if(!is.null(timeVar2)){
         if(basisFunction=='B-Splines')
@@ -472,19 +483,21 @@ aggrmodel <- function(formula=NULL,
     }
     ## Output data with predicted values
     dd$pred <- as.numeric(X %*% betaOut)
+    if(positive_restriction) dd$pred <- exp(dd$pred)
     dd$group <- as.factor(dd$group)
     levels(dd$group) <- levels(grps)
     dd$rep <- as.factor(dd$rep)
     levels(dd$rep) <- levels(reps)
     ## Return ----
+    parsSE <-  tryCatch(sqrt(abs(diag(solve(opt$hessian)))),error=function(e) e )
     outList <- list('beta' = as.matrix(betaOut),
                 'pars' = parOut,
-                'parsSE' = sqrt(abs(diag(solve(opt$hessian)))),
+                'parsSE' = ifelse(positive_restriction, parsSE[-c(1:nCoef)], parsSE),
                 'mc' = mcMtx,
                 'n_basis' = n_basis,
                 'n_order' = n_order,
                 'lkVec' = lkVec,
-                'betaSE' = betaSE)
+                'betaSE' = ifelse(positive_restriction, parsSE[1:nCoef], betaSE))
     if(returnFitted) outList[["fitted"]] <- dd
     else outList[["residuals"]] <- dd$resid
     if(optSampleCovMatrix) outList[["normValues"]] <- normVec
@@ -499,9 +512,9 @@ aggrmodel <- function(formula=NULL,
         betaCov <- parOut[1:(C*n_basis_cov)]
         betaCov_lwr <- betaCov - qnorm(.975)*outList[["parsSE"]][1:(C*n_basis_cov)]
         betaCov_upr <- betaCov + qnorm(.975)*outList[["parsSE"]][1:(C*n_basis_cov)]
-        ddCov <- data.frame(funcVar = c( B %*% matrix(betaCov, ncol=3)),
-                            funcVar_lwr = c( B %*% matrix(betaCov_lwr, ncol=3)),
-                            funcVar_upr = c( B %*% matrix(betaCov_upr, ncol=3)),
+        ddCov <- data.frame(funcVar = c( B %*% matrix(betaCov, ncol=C)),
+                            funcVar_lwr = c( B %*% matrix(betaCov_lwr, ncol=C)),
+                            funcVar_upr = c( B %*% matrix(betaCov_upr, ncol=C)),
                             type = rep(1:C, each=length(tvec)),
                             time = rep(tvec,times=C)
         )
