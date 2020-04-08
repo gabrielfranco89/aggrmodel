@@ -22,8 +22,8 @@ aggrmodel(
   cicleRep = FALSE,
   n_order = 4,
   covType = "Homog_Uniform",
-  corType = "periodic",
-  optSampleCovMatrix = TRUE,
+  corType = "exponential",
+  optSampleCovMatrix = FALSE,
   sigPar_init = NULL,
   corPar_init = NULL,
   tauPar_init = NULL,
@@ -35,7 +35,7 @@ aggrmodel(
   verbose = FALSE,
   optVerbose = FALSE,
   useGrad = FALSE,
-  diffTol = 1e-06,
+  diffTol = 1e-05,
   itMax = 100
 )
 }

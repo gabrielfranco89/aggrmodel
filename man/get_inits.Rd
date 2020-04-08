@@ -13,7 +13,6 @@ get_inits(
   market,
   sigPar_init,
   corPar_init,
-  tauPar_init,
   betaCov_init,
   truncateDec,
   n_basis,
@@ -38,8 +37,6 @@ get_inits(
 
 \item{corPar_init}{Initial value for correlation parameters}
 
-\item{tauPar_init}{Initial value for covariance parameter}
-
 \item{betaCov_init}{inital values for variance functional}
 
 \item{truncateDec}{Decimal to be truncated}
@@ -55,6 +52,8 @@ get_inits(
 \item{basisFunc}{Basis function type}
 
 \item{y}{Dependent variable}
+
+\item{tauPar_init}{Initial value for covariance parameter}
 }
 \value{
 An object with initial values
