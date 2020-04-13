@@ -381,10 +381,10 @@ aggrmodel_cluster <- function(formula=NULL,
       tmp <- by(data = dd,INDICES = grp_rep,FUN = function(df){
         j <- df$group[1]
         i <- df$rep[1]
-        mvtnorm::dmvnorm(x = as.numeric(df$y),
-                         mean = as.numeric(c(xbeta[[j]][,b])),
-                         sigma = as.matrix(sigMtxList[[b]][[j]]),
-                         log=TRUE)
+        mvnfast::dmvn(X = as.numeric(df$y),
+                      mu = as.numeric(c(xbeta[[j]][,b])),
+                      sigma = as.matrix(sigMtxList[[b]][[j]]),
+                      log=TRUE)
       })
       probTab[,c(2+b)] <- pi_init[b]*exp(as.numeric(tmp))
     }
