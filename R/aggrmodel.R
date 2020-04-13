@@ -164,8 +164,6 @@ aggrmodel <- function(formula=NULL,
                       t=t, n_order=n_order, basisFunc=basisFunction
                       )
     beta_init <- init$beta
-    # if(positive_restriction)
-    #     beta_init <- solve(t(X)%*%X) %*% (t(X)%*%log(y))
     parIn <- init$par
     lowerBoundVec <- init$lb
     upperBoundVec <- init$ub
@@ -386,7 +384,7 @@ aggrmodel <- function(formula=NULL,
         }
         lkVec[itCount] <- lkValue
         lkDiff <- abs(lkOut - lkIn)
-        #if(positive_restriction) lkDiff = 0
+        if(positive_restriction) lkDiff = 0
         lkIn <- lkOut
         itCount <- itCount + 1
         if(itCount == itMax)
@@ -428,9 +426,6 @@ aggrmodel <- function(formula=NULL,
                             mc_upr = as.numeric(mc_upr),
                             time=rep(tuni,times=C),
                             type=rep(unlist(unique(market[,2])), each=length(tuni)))
-        # if(positive_restriction){
-        #   mcMtx[,1:3] <- exp(mcMtx[,1:3])
-        # }
     }
     if(!is.null(timeVar2)){
         if(basisFunction=='B-Splines')
