@@ -164,8 +164,8 @@ aggrmodel <- function(formula=NULL,
                       t=t, n_order=n_order, basisFunc=basisFunction
                       )
     beta_init <- init$beta
-    if(positive_restriction)
-        beta_init <- solve(t(X)%*%X) %*% (t(X)%*%log(y))
+    # if(positive_restriction)
+    #     beta_init <- solve(t(X)%*%X) %*% (t(X)%*%log(y))
     parIn <- init$par
     lowerBoundVec <- init$lb
     upperBoundVec <- init$ub
@@ -182,9 +182,9 @@ aggrmodel <- function(formula=NULL,
         ## W.1 Obtain covariance estimates via optim
         if(positive_restriction){
             parIn <- c(betaIn,parIn)
-            pLen <- length(parIn)
-            lowerBoundVec <- rep(-Inf, pLen)
-            upperBoundVec <- rep(Inf, pLen)
+            pLen <- length(betaIn)
+            lowerBoundVec <- c(rep(0, pLen), lowerBoundVec)
+            upperBoundVec <- c(rep(Inf, pLen), upperBoundVec)
         }
         if(!optSampleCovMatrix){
             residListGroup <- NULL
@@ -232,14 +232,14 @@ aggrmodel <- function(formula=NULL,
             nCoef <- ncol(X)
             betaOut <- parOut[c(1:nCoef)]
             parOut <- parOut[-c(1:nCoef)]
-            if(covType == 'Homog_Uniform')
-                parOut[2] <- log(parOut[2])
-            if(covType == 'Homog')
-                parOut[(C+1):(2*C)] <- log(parOut[(C+1):(2*C)])
-            if(covType == 'Heterog'){
-                 parOut[(C*n_basis_cov+1):(length(parOut))] <- log( parOut[(C*n_basis_cov+1):(length(parOut))])
-                 # parOut[((length(parOut)-C+1):length(parOut))] <- log( parOut[((length(parOut)-C+1):length(parOut))])
-            }
+            # if(covType == 'Homog_Uniform')
+            #     parOut[2] <- log(parOut[2])
+            # if(covType == 'Homog')
+            #     parOut[(C+1):(2*C)] <- log(parOut[(C+1):(2*C)])
+            # if(covType == 'Heterog'){
+            #      parOut[(C*n_basis_cov+1):(length(parOut))] <- log( parOut[(C*n_basis_cov+1):(length(parOut))])
+            #      # parOut[((length(parOut)-C+1):length(parOut))] <- log( parOut[((length(parOut)-C+1):length(parOut))])
+            # }
             parsSE <-  tryCatch(sqrt(abs(diag(solve(opt$hessian)))),error=function(e) e )
             betaSE <- parsSE[1:nCoef]
         }
@@ -428,9 +428,9 @@ aggrmodel <- function(formula=NULL,
                             mc_upr = as.numeric(mc_upr),
                             time=rep(tuni,times=C),
                             type=rep(unlist(unique(market[,2])), each=length(tuni)))
-        if(positive_restriction){
-          mcMtx[,1:3] <- exp(mcMtx[,1:3])
-        }
+        # if(positive_restriction){
+        #   mcMtx[,1:3] <- exp(mcMtx[,1:3])
+        # }
     }
     if(!is.null(timeVar2)){
         if(basisFunction=='B-Splines')
@@ -483,21 +483,25 @@ aggrmodel <- function(formula=NULL,
     }
     ## Output data with predicted values
     dd$pred <- as.numeric(X %*% betaOut)
-    if(positive_restriction) dd$pred <- exp(dd$pred)
+    # if(positive_restriction) dd$pred <- exp(dd$pred)
     dd$group <- as.factor(dd$group)
     levels(dd$group) <- levels(grps)
     dd$rep <- as.factor(dd$rep)
     levels(dd$rep) <- levels(reps)
     ## Return ----
     parsSE <-  tryCatch(sqrt(abs(diag(solve(opt$hessian)))),error=function(e) e )
+    if(positive_restriction){
+        betaSE <- parsSE[c(1:nCoef)]
+        parsSE <- parsSE[-c(1:nCoef)]
+    }
     outList <- list('beta' = as.matrix(betaOut),
                 'pars' = parOut,
-                'parsSE' = ifelse(positive_restriction, parsSE[-c(1:nCoef)], parsSE),
+                'parsSE' = parsSE,
                 'mc' = mcMtx,
                 'n_basis' = n_basis,
                 'n_order' = n_order,
                 'lkVec' = lkVec,
-                'betaSE' = ifelse(positive_restriction, parsSE[1:nCoef], betaSE))
+                'betaSE' = betaSE)
     if(returnFitted) outList[["fitted"]] <- dd
     else outList[["residuals"]] <- dd$resid
     if(optSampleCovMatrix) outList[["normValues"]] <- normVec

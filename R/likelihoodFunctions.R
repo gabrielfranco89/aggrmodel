@@ -156,17 +156,15 @@ loglikWrapper <- function(pars,
         pars <- pars[-c(1:nCoef)]
     }
     mu <- designWrap %*% betaWrap
-    if(positive) mu <- exp(mu)
     ## Build model matrix -------------------
     if(covWrap == 'Homog_Uniform'){
-        cp <- ifelse(positive,exp(pars[2]),pars[2])
         sigmaList <- covMatrix(market = mktWrap,
                                group.name = 'Group',
                                type.name = 'type',
                                mkt.name = 'mkt',
                                timeVec = dataWrap$time,
                                sigPar = pars[1],
-                               corPar = cp,
+                               corPar = pars[2],
                                covType = 'Homog_Uniform',
                                corType = corWrap,
                                truncateDec = truncateDec)
@@ -174,7 +172,6 @@ loglikWrapper <- function(pars,
     if(covWrap == 'Homog'){
         C <- length(unlist(unique(mktWrap[,2])))
         cp <- pars[(C+1):(2*C)]
-        if(positive) cp <- exp(cp)
         sigmaList <- covMatrix(market = mktWrap,
                                group.name = 'Group',
                                type.name = 'type',
@@ -199,10 +196,6 @@ loglikWrapper <- function(pars,
         # sigParIn <- pars[(C*nBasisCov+1):(length(pars)-(2*C))]
         corParIn <- pars[(C*nBasisCov+1):length(pars)]
         # tauParIn  <- pars[((length(pars)-C+1):length(pars))]
-        if(positive){
-        corParIn <- exp(corParIn)
-        # tauParIn <- exp(tauParIn)
-        }
         sigmaList <- covMatrix(market = mktWrap,
                                group.name = 'Group',
                                type.name = 'type',
