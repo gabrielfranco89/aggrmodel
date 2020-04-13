@@ -179,6 +179,11 @@ aggrmodel <- function(formula=NULL,
     while(lkDiff > diffTol & itCount < itMax){
         ## W.1 Obtain covariance estimates via optim
         if(positive_restriction){
+            if(cicleRep){
+                ## First beta will be computed by restriction
+                betaIn <- matrix(betaIn, ncol = C)
+                betaIn <- c(betaIn[-1,])
+            }
             parIn <- c(betaIn,parIn)
             pLen <- length(betaIn)
             lowerBoundVec <- c(rep(0, pLen), lowerBoundVec)
@@ -221,25 +226,32 @@ aggrmodel <- function(formula=NULL,
                      nOrderCov = n_order,
                      truncateDec = truncateDec,
                      positive = positive_restriction,
+                     cicle = cicleRep,
                      verbWrap = optVerbose,
                      hessian=TRUE)
         parOut <- opt$par
 
         ## W.2 Update Sigma estimates ----
         if(positive_restriction){
-            nCoef <- ncol(X)
-            betaOut <- parOut[c(1:nCoef)]
-            parOut <- parOut[-c(1:nCoef)]
-            # if(covType == 'Homog_Uniform')
-            #     parOut[2] <- log(parOut[2])
-            # if(covType == 'Homog')
-            #     parOut[(C+1):(2*C)] <- log(parOut[(C+1):(2*C)])
-            # if(covType == 'Heterog'){
-            #      parOut[(C*n_basis_cov+1):(length(parOut))] <- log( parOut[(C*n_basis_cov+1):(length(parOut))])
-            #      # parOut[((length(parOut)-C+1):length(parOut))] <- log( parOut[((length(parOut)-C+1):length(parOut))])
-            # }
-            parsSE <-  tryCatch(sqrt(abs(diag(solve(opt$hessian)))),error=function(e) e )
-            betaSE <- parsSE[1:nCoef]
+            if(cicleRep){
+                nCoef <- ncol(X) - C
+                betaOut <- parOut[c(1:nCoef)]
+                parOut <- parOut[-c(1:nCoef)]
+                parsSE <-  tryCatch(sqrt(abs(diag(solve(opt$hessian)))),error=function(e) e )
+                betaSE <- parsSE[1:nCoef]
+                betaOut <- matrix(betaOut, ncol=C)
+                betaOut <- rbind(betaOut[nrow(betaOut),], betaOut)
+                betaOut <- c(betaOut)
+                betaSE <- matrix(betaSE, ncol=C)
+                betaSE <- rbind(betaSE[nrow(betaSE),], betaSE)
+                betaSE <- c(betaSE)
+            } else{
+                nCoef <- ncol(X)
+                betaOut <- parOut[c(1:nCoef)]
+                parOut <- parOut[-c(1:nCoef)]
+                parsSE <-  tryCatch(sqrt(abs(diag(solve(opt$hessian)))),error=function(e) e )
+                betaSE <- parsSE[1:nCoef]
+            }
         }
         if(!positive_restriction){
             if(covType == 'Homog_Uniform'){
@@ -486,7 +498,7 @@ aggrmodel <- function(formula=NULL,
     ## Return ----
     parsSE <-  tryCatch(sqrt(abs(diag(solve(opt$hessian)))),error=function(e) e )
     if(positive_restriction){
-        betaSE <- parsSE[c(1:nCoef)]
+    #    betaSE <- parsSE[c(1:nCoef)]
         parsSE <- parsSE[-c(1:nCoef)]
     }
     outList <- list('beta' = as.matrix(betaOut),

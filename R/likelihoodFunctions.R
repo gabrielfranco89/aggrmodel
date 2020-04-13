@@ -148,12 +148,22 @@ loglikWrapper <- function(pars,
                           nOrderCov, ## for heterog model
                           verbWrap,
                           positive = FALSE,
+                          cicle = FALSE,
                           truncateDec = NULL
                           ){
     if(positive){
+      if(!cicle){
         nCoef <- ncol(designWrap)
         betaWrap <- pars[c(1:nCoef)]
         pars <- pars[-c(1:nCoef)]
+      } else{
+        nCoef <- ncol(designWrap)-nCons
+        betaWrap <- pars[c(1:nCoef)]
+        pars <- pars[-c(1:nCoef)]
+        betaWrap <- matrix(betaWrap, ncol=nCons)
+        betaWrap <- rbind(betaWrap[nrow(betaWrap),], betaWrap)
+        betaWrap <- c(betaWrap)
+      }
     }
     mu <- designWrap %*% betaWrap
     ## Build model matrix -------------------
