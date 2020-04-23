@@ -8,7 +8,7 @@
 #' @return ggplot plot object
 #' @import ggplot2
 #' @export
-plot.aggrmodel <- function(object, scales = 'fixed', IC = TRUE){
+plot.aggrmodel <- function(object, scales = 'fixed', IC = TRUE, use_center=TRUE){
     mcMtx <- object$mc
     if(is.null(mcMtx$time2)){
       p <- ggplot(aes(x=time, y=mc), data=mcMtx) +
@@ -18,7 +18,15 @@ plot.aggrmodel <- function(object, scales = 'fixed', IC = TRUE){
           geom_line(aes(x=time, y=mc_upr), linetype=2, alpha = .4)
       p + facet_wrap(.~type, scales = scales)
     }else{
-      p <- ggplot(aes(x=time, y=mc, group=time2), data=mcMtx) +
+      if(use_center){
+        sub_time2 = as.numeric(summary(mcMtx$time2)[2:4])
+        sub_time2 = round(sub_time2,6)
+        mcMtx = mcMtx %>%
+          filter(time2 >= sub_time2[1],
+                 time2 <= sub_time2[3])
+      }
+      p <- mcMtx %>%
+        ggplot(aes(x=time, y=mc, group=time2)) +
           geom_line(aes(col=time2)) +
           facet_wrap(.~type, scales=scales)
       p

@@ -19,6 +19,7 @@ loglikWrapper(
   nOrderCov,
   verbWrap,
   positive = FALSE,
+  cicle = FALSE,
   truncateDec = NULL
 )
 }

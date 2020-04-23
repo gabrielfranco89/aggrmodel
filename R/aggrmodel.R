@@ -96,7 +96,7 @@ aggrmodel <- function(formula=NULL,
     y = data[[substitute(Y)]]
     t = data[[substitute(timeVar)]]
     t = t/max(t)
-    if(is.null(timeVar2)) t2 <- NULL
+    if(is.null(data[[substitute(timeVar2)]])) t2 <- NULL
     else t2 <- data[[substitute(timeVar2)]]
     grps = as.factor(data[[substitute(groupVar)]])
     reps = as.factor(data[[substitute(repVar)]])
@@ -108,7 +108,7 @@ aggrmodel <- function(formula=NULL,
                      rep=as.integer(reps),
                      time=t,
                      y = y)
-    if(!is.null(timeVar2)) dd$time2 <- t2
+    dd$time2 <- t2
     dd <- dd[order(dd$group, dd$rep, dd$time),]
     y <- dd$y
     t <- dd$time
@@ -414,7 +414,7 @@ aggrmodel <- function(formula=NULL,
     # betaMult <- solve(t(X)%*%sigmaInv%*%X) %*% t(X)%*%sigmaInv
     # betaSE <- sqrt(diag(betaMult%*%sigmaum%*%t(betaMult)))
     ## Mean curves ----
-    if(is.null(timeVar2)){
+    if(is.null(t2)){
         if(basisFunction=='B-Splines')
             basisObj = create.bspline.basis(range(t),
                                             nbasis = n_basis,
@@ -439,7 +439,7 @@ aggrmodel <- function(formula=NULL,
                             time=rep(tuni,times=C),
                             type=rep(unlist(unique(market[,2])), each=length(tuni)))
     }
-    if(!is.null(timeVar2)){
+    if(!is.null(t2)){
         if(basisFunction=='B-Splines')
             basisObj = create.bspline.basis(range(t),
                                             nbasis = n_basis,
@@ -574,7 +574,7 @@ get_inits <- function(X, I, data, C,
     # ddfit_init <- data.frame(y=y,X)
     fit_init <- lm(data$y~X-1)
     beta_init <- coef(fit_init)
-    sigma_fit <- sqrt(summary(fit_init)$sigma/(I-1))
+    sigma_fit <- sqrt(summary(fit_init)$sigma/(I))
     # rm(ddfit_init)
 
     if(covType == 'Homog_Uniform'){

@@ -4,7 +4,7 @@
 \alias{plot.aggrmodel}
 \title{Plot fit's mean curve}
 \usage{
-\method{plot}{aggrmodel}(object, scales = "fixed", IC = TRUE)
+\method{plot}{aggrmodel}(object, scales = "fixed", IC = TRUE, use_center = TRUE)
 }
 \arguments{
 \item{object}{aggrmodel object fit}
