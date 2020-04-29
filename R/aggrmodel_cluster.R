@@ -340,6 +340,7 @@ aggrmodel_cluster <- function(formula=NULL,
                    timeVec = t,n_basis = K,
                    basis = basisFunction,n_order = n_order)
 
+  lkVec <- numeric(itMax)
   while(lkDiff > diffTol & n_it < itMax){
     if(verbose)
       message(paste("\nIteration num ",n_it))
@@ -616,6 +617,7 @@ aggrmodel_cluster <- function(formula=NULL,
     beta_init <- beta_out
     pi_init <- matrix(pi_out,ncol=B)
     cp_in <- cp_out
+    lkVec[n_it] <- lkOut
     n_it <- n_it+1
     lkIn <- lkOut
   } # end while loop
@@ -672,10 +674,11 @@ aggrmodel_cluster <- function(formula=NULL,
   outList <- list("probTab"=probTab,
                   "betaPar" = beta_out,
                   "betaSE" = betaSE,
-                  "piPar" = pi_out[-c(1:2)],
+                  "piPar" = pi_out,
                   "covPar" = covPar,
                   "covParSE" = tryCatch(sqrt(diag(solve(opt$hessian))), error=function(e) e),
-                  'mc' = mc)
+                  'mc' = mc,
+                  'lkVec' = lkVec)
   if(returnPred) outList[['predData']] <- ddOut
   class(outList)='aggrmodel_cluster'
   outList
