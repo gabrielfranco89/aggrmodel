@@ -96,7 +96,7 @@ aggrmodel <- function(formula=NULL,
     y = data[[substitute(Y)]]
     t = data[[substitute(timeVar)]]
     t = t/max(t)
-    if(is.null(data[[substitute(timeVar2)]])) t2 <- NULL
+    if(is.null(timeVar2)) t2 <- NULL
     else t2 <- data[[substitute(timeVar2)]]
     grps = as.factor(data[[substitute(groupVar)]])
     reps = as.factor(data[[substitute(repVar)]])
@@ -510,6 +510,10 @@ aggrmodel <- function(formula=NULL,
                 'lkVec' = lkVec,
                 'betaSE' = betaSE)
     if(returnFitted) outList[["fitted"]] <- dd
+    if(!is.null(t2)){
+        outList[["n_basis2"]] <- n_basis2
+        outList[["n_order2"]] <- n_order2
+    }
     else outList[["residuals"]] <- dd$resid
     if(optSampleCovMatrix) outList[["normValues"]] <- normVec
     if(!is.null(formula))

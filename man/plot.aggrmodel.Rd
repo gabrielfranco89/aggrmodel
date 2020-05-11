@@ -4,12 +4,18 @@
 \alias{plot.aggrmodel}
 \title{Plot fit's mean curve}
 \usage{
-\method{plot}{aggrmodel}(object, scales = "fixed", IC = TRUE, use_center = TRUE)
+\method{plot}{aggrmodel}(object, scales = "fixed", CI = TRUE, sub_temp = TRUE, temps = NULL)
 }
 \arguments{
 \item{object}{aggrmodel object fit}
 
 \item{scales}{Character value indicating if scales should be 'fixed' or 'free' in the ggplot}
+
+\item{CI}{Logical. Plot mean curves confidence interval (default:TRUE)}
+
+\item{sub_temp}{When with double functional component, plot only the 3 first quartiles (default:TRUE)}
+
+\item{temps}{Points of second functional component to be evaluated. If empty, it will use the 3 first quartiles}
 }
 \value{
 ggplot plot object
