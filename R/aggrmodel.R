@@ -96,7 +96,7 @@ aggrmodel <- function(formula=NULL,
     y = data[[substitute(Y)]]
     t = data[[substitute(timeVar)]]
     t = t/max(t)
-    if(is.null(timeVar2)) t2 <- NULL
+    if(is.null(substitute(timeVar2))) t2 <- NULL
     else t2 <- data[[substitute(timeVar2)]]
     grps = as.factor(data[[substitute(groupVar)]])
     reps = as.factor(data[[substitute(repVar)]])
