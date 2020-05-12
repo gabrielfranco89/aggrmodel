@@ -308,14 +308,14 @@ aggrmodel_cluster <- function(formula=NULL,
   sigPar_init <- unlist(lapply(cl_init[[2]],function(x) summary(x)$sigma))
   sigPar_init <- matrix(sqrt(sigPar_init), ncol=B)
   if(is.null(corPar_init))
-    corPar_init <- matrix(20, ncol=B)
+    corPar_init <- matrix(1, ncol=B)
   else
     corPar_init <- matrix(corPar_init, ncol=B)
   if(covType == 'Homog_Uniform'){
     cp_in <- c(sigPar_init,corPar_init)
   }
   if(covType == 'Homog'){
-    cp_in <- c(rep(sigPar_init,C),rep(corPar_init,3))
+    cp_in <- c(rep(sigPar_init,C),rep(c(corPar_init),C))
   }
   pi_init <- prop.table(table(cluster_init[,2]))
   pi_init <- matrix(pi_init, ncol=B)
