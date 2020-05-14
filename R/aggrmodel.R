@@ -454,6 +454,10 @@ aggrmodel <- function(formula=NULL,
         basis2 <- ifelse(is.null(basisFunction2),basisFunction,basisFunction2)
         n_order2 <- ifelse(is.null(n_order2),n_order,n_order2)
         tuni2 <- unique(t2)
+        ## Limit t2 size
+        if(length(tuni2)>100){
+            tuni2 <- quantile(tuni2, seq(0,1,length.out=100), names = FALSE)
+        }
         if(basis2=='B-Splines')
             basisObj2 = create.bspline.basis(range(tuni2),
                                             nbasis = n_basis2,
@@ -476,17 +480,12 @@ aggrmodel <- function(formula=NULL,
         ## Separate betas
         L <- ncol(B2)
         betaMC <- betaOut[1:(C*L*n_basis)]
-        # betaMtx <- cbind(beta=as.matrix(betaMC),
-        #                  type=rep(1:C, each=L*n_basis))
-        # mcMtx <- tapply(betaMtx[,1],
-        #                 betaMtx[,2],
-        #                 function(x) B %*% x)
         mcMtx <- B%*%matrix(betaMC,ncol=C)
+        rm(B) ; rm(B1) ; rm(B2) ;
         mcMtx <- data.frame(time=rep(t1,times=C),
                             time2=rep(t2,times=C),
                             type=rep(unique(market[,2]), each=length(t1)),
                             mc=c(mcMtx))
-        # colnames(mcMtx) <- c(timeVar,timeVar2,type,mc)
     }
     ## Output data with predicted values
     dd$pred <- as.numeric(X %*% betaOut)

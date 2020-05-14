@@ -54,7 +54,7 @@ plot.aggrmodel <- function(object, scales = 'fixed', CI = TRUE, sub_temp=TRUE, t
                         type = rep(unique(mc$type), each=tLen*length(temps)),
                         time = rep(unique(mc$time), times = length(temps)*C),
                         time2 = rep(rep(temps,each=tLen),times=C))
-      }
+      } # end subtemp
       p <- ggplot(aes(x=time, y=mc,group=time2), data=mc) +
         geom_line()
       if(CI)
