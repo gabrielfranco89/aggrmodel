@@ -484,7 +484,7 @@ aggrmodel <- function(formula=NULL,
         rm(B) ; rm(B1) ; rm(B2) ;
         mcMtx <- data.frame(time=rep(t1,times=C),
                             time2=rep(t2,times=C),
-                            type=rep(unique(market[,2]), each=length(t1)),
+                            type=rep(unlist(unique(market[,2])), each=length(t1)),
                             mc=c(mcMtx))
     }
     ## Output data with predicted values
