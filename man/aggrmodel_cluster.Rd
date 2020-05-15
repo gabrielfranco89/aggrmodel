@@ -22,7 +22,7 @@ aggrmodel_cluster(
   covType = "Homog_Uniform",
   corType = "exponential",
   optMethod = "L-BFGS-B",
-  returnPred = FALSE,
+  returnFitted = FALSE,
   optLk = TRUE,
   corPar_init = NULL,
   diffTol = 1e-06,
@@ -78,17 +78,15 @@ An aggrmodel_cluster object
 Fit aggregated model with clusters
 }
 \examples{
-library(dplyr)
 
-data = simuData \%>\%
-  select(group, rep, time, y)
-df=data
-mkt = market
-mkt$Cluster=NULL
-colnames(mkt) = c('group','type','num')
+set.seed(81453)
+df <- createSimuData(nRep=5)
+mkt <- attr(df,"market")
 
-## Go for a walk after run the code below
-fitCluster = aggrmodel_cluster(data = df, market=mkt, Y = 'y', timeVar =
-'time',groupVar = 'group', repVar = 'rep', n_basis = 7,n_basis_cov = NULL,
-n_cluster = 2,n_trials = 1000, n_order = 4, corType = 'periodic', verbose=TRUE)
+fit_cl = aggrmodel_cluster(data = df, market=mkt, Y = obs, timeVar =
+time,groupVar = group, repVar = rep, n_basis = 9, n_basis_cov = NULL,
+n_cluster = 2,n_trials = 500, n_order = 4, corType = 'exponential',
+returnFitted = TRUE, verbose=TRUE)
+
+plot(fitCluster, scales="free")
 }

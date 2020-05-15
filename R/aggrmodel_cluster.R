@@ -211,7 +211,7 @@ getClusterInitials <- function(data,
 #' @param verbose TRUE/FALSE indicating if steps of optimization should be printed as messages (Default: FALSE)
 #' @param cicleRep Indicator TRUE/FALSE if replicates are cyclical
 #' @param optMethod
-#' @param returnPred
+#' @param returnFitted
 #' @param optLk
 #' @param corPar_init
 #'
@@ -220,21 +220,20 @@ getClusterInitials <- function(data,
 #' @name aggrmodel_cluster
 #'
 #' @import optimx
-#' @importFrom mvtnorm dmvnorm
+#' @importFrom mvnfast dmvn
 #' @export
-#' @examples library(dplyr)
+#' @examples
 #'
-#' data = simuData %>%
-#'   select(group, rep, time, y)
-#' df=data
-#' mkt = market
-#' mkt$Cluster=NULL
-#' colnames(mkt) = c('group','type','num')
+#' set.seed(81453)
+#' df <- createSimuData(nRep=5)
+#' mkt <- attr(df,"market")
 #'
-#' ## Go for a walk after run the code below
-#' fitCluster = aggrmodel_cluster(data = df, market=mkt, Y = 'y', timeVar =
-#' 'time',groupVar = 'group', repVar = 'rep', n_basis = 7,n_basis_cov = NULL,
-#' n_cluster = 2,n_trials = 1000, n_order = 4, corType = 'periodic', verbose=TRUE)
+#' fit_cl = aggrmodel_cluster(data = df, market=mkt, Y = obs, timeVar =
+#' time,groupVar = group, repVar = rep, n_basis = 9, n_basis_cov = NULL,
+#' n_cluster = 2,n_trials = 500, n_order = 4, corType = 'exponential',
+#' returnFitted = TRUE, verbose=TRUE)
+#'
+#' plot(fitCluster, scales="free")
 aggrmodel_cluster <- function(formula=NULL,
                               data,
                               market,
@@ -252,7 +251,7 @@ aggrmodel_cluster <- function(formula=NULL,
                               covType = 'Homog_Uniform',
                               corType = 'exponential',
                               optMethod = "L-BFGS-B",
-                              returnPred = FALSE,
+                              returnFitted = FALSE,
                               optLk = TRUE,
                               corPar_init = NULL,
                               diffTol = 1e-6,
@@ -286,7 +285,7 @@ aggrmodel_cluster <- function(formula=NULL,
                    rep=as.integer(reps),
                    time=t,
                    y = y)
-   dd <- dd[order(dd$group, dd$rep, dd$time),]
+  dd <- dd[order(dd$group, dd$rep, dd$time),]
   y <- dd$y
   t <- dd$time
   colnames(market) <- c("group","type","num")
@@ -317,8 +316,14 @@ aggrmodel_cluster <- function(formula=NULL,
   if(covType == 'Homog'){
     cp_in <- c(rep(sigPar_init,C),rep(c(corPar_init),C))
   }
-  pi_init <- prop.table(table(cluster_init[,2]))
-  pi_init <- matrix(pi_init, ncol=B)
+  # pi_init <- prop.table(table(cluster_init[,2]))
+  # pi_init <- matrix(pi_init, ncol=B)
+  pi_init <- matrix(nrow=J,ncol=B)
+  for(b in 1:B){
+    for(j in 1:J){
+      pi_init[j,b]<-ifelse(cluster_init[j,2]==b,.9,(.1/(B-1)))
+    }
+  }
   ## While loop ------
   lkIn <- Inf
   lkDiff = diffTol+1
@@ -341,6 +346,7 @@ aggrmodel_cluster <- function(formula=NULL,
                    basis = basisFunction,n_order = n_order)
 
   lkVec <- numeric(itMax)
+  pi_out <- pi_init
   while(lkDiff > diffTol & n_it < itMax){
     if(verbose)
       message(paste("\nIteration num ",n_it))
@@ -382,12 +388,14 @@ aggrmodel_cluster <- function(formula=NULL,
       tmp <- by(data = dd,INDICES = grp_rep,FUN = function(df){
         j <- df$group[1]
         i <- df$rep[1]
-        mvnfast::dmvn(X = as.numeric(df$y),
+        fyij <- mvnfast::dmvn(X = as.numeric(df$y),
                       mu = as.numeric(c(xbeta[[j]][,b])),
                       sigma = as.matrix(sigMtxList[[b]][[j]]),
-                      log=TRUE)
+                      log=FALSE)
+        pi_init[j,b]*fyij
       })
-      probTab[,c(2+b)] <- pi_init[b]*exp(as.numeric(tmp))
+      # probTab[,c(2+b)] <- pi_init[j,b]*exp(as.numeric(tmp))
+      probTab[,c(2+b)] <- as.numeric(tmp)
     }
     denom <- apply(probTab[,-c(1:2)],1,sum)
     for(b in 1:B)  probTab[,c(2+b)] <- probTab[,c(2+b)]/denom
@@ -592,7 +600,13 @@ aggrmodel_cluster <- function(formula=NULL,
         beta_out[,b] <- as.numeric(solve(tmpLeft,tmpRight))
       } ## end if/else cicle
     }
-    pi_out <- apply(probTab[,-c(1:2)],2,mean)
+    for(b in 1:B){
+      pi_out[,b] <- tapply(probTab[,2+b],
+                           probTab$grps,
+                           mean,
+                           simplify = TRUE)
+    }
+    # pi_out <- apply(probTab[,-c(1:2)],2,mean)
     xbeta_out <- lapply(X, function(x)  x %*% beta_out)
 
     ## Check convergence & updates
@@ -615,31 +629,41 @@ aggrmodel_cluster <- function(formula=NULL,
     # }
     lkDiff <- abs(lkIn - lkOut)
     beta_init <- beta_out
-    pi_init <- matrix(pi_out,ncol=B)
+    pi_init <- pi_out
     cp_in <- cp_out
     lkVec[n_it] <- lkOut
     n_it <- n_it+1
     lkIn <- lkOut
   } # end while loop
   ## OUTPUTS ----
-  predList <- apply(beta_out,2,function(b) XLong %*% b)
-  predList <- unlist(predList)
-  predList <- matrix(predList, ncol=B)
-  predListNames <- paste("cluster",1:B,sep='')
-  colnames(predList) <- predListNames
-  ddOut <- cbind(dd,predList)
-  probTab <- as.data.frame(probTab)
-  colnames(probTab)[1:2] <- c('rep','group')
-  ddOut <- merge(ddOut, probTab)
-  ec <- ncol(ddOut)
-  colnames(ddOut)[(ec-B+1):ec] <- paste('p',1:B,sep='')
-  mm<- apply(ddOut[,(ec-B+1):ec],1,which.max)
-  pred <- numeric(nrow(ddOut))
-  for(k in 1:nrow(ddOut)){
-    pred[k]<-ddOut[k,(mm[k]+4)]
-  }
-  ddOut$pred <- pred
-  ddOut <- ddOut[,c(1:4,ncol(ddOut))]
+  # predList <- apply(beta_out,2,function(b) XLong %*% b)
+  # predList <- unlist(predList)
+  # predList <- matrix(predList, ncol=B)
+  predList <- XLong %*% beta_out
+  pizao <- apply(pi_out,2,rep,each=T*I)
+  pred <- numeric(nrow(dd))
+  for(b in 1:B)
+    pred <- pred + predList[,b]*pizao[,b]
+  #
+  # predListNames <- paste("cluster",1:B,sep='')
+  # colnames(predList) <- predListNames
+  # ddOut <- cbind(dd,predList)
+  # probTab <- as.data.frame(probTab)
+  # colnames(probTab)[1:2] <- c('rep','group')
+  # ddOut <- merge(ddOut, probTab)
+  # ec <- ncol(ddOut)
+  # colnames(ddOut)[(ec-B+1):ec] <- paste('p',1:B,sep='')
+  # mm<- apply(ddOut[,(ec-B+1):ec],1,which.max)
+  # pred <- numeric(nrow(ddOut))
+  # for(k in 1:nrow(ddOut)){
+  #   pred[k]<-ddOut[k,(mm[k]+4)]
+  # }
+  dd$pred <- pred
+  dd$group <- as.factor(dd$group)
+  levels(dd$group) <- levels(grps)
+  dd$rep <- as.factor(dd$rep)
+  levels(dd$rep) <- levels(reps)
+  # dd <- dd[,c(1:4,ncol(dd))]
   ## Mean curves ----
   if(basisFunction=='B-Splines')
     basisObj = create.bspline.basis(range(t),
@@ -679,7 +703,7 @@ aggrmodel_cluster <- function(formula=NULL,
                   "covParSE" = tryCatch(sqrt(diag(solve(opt$hessian))), error=function(e) e),
                   'mc' = mc,
                   'lkVec' = lkVec)
-  if(returnPred) outList[['predData']] <- ddOut
+  if(returnFitted) outList[['fitted']] <- dd
   class(outList)='aggrmodel_cluster'
   outList
 }

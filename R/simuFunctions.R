@@ -30,9 +30,9 @@ createSimuData <- function(B1 = 4,
                            nRep = 20,
                            market=NULL,
                            market_range = 5:25,
-                           sigPar = c(2,2,2,4,4,4),
-                           tauPar = c(.5,.5,.5, .4,.4,.4),
-                           corPar = c(4,4,4,6,6,6),
+                           sigPar = 1/c(2,2,2,4,4,4),
+                           tauPar = rep(0,6),
+                           corPar = 1/c(4,4,4,6,6,6),
                            nu1 = NULL,
                            nu2 = NULL,
                            tmp_bt1 = NULL,
@@ -40,7 +40,7 @@ createSimuData <- function(B1 = 4,
                            beta1 = 0,
                            beta2 = 0,
                            seed=NULL,
-                           tempPar=1
+                           tempPar=0
                            ){
     ## Preamble
     if(any(B1<3,B2<3))

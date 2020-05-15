@@ -10,9 +10,9 @@ createSimuData(
   nRep = 20,
   market = NULL,
   market_range = 5:25,
-  sigPar = c(2, 2, 2, 4, 4, 4),
-  tauPar = c(0.5, 0.5, 0.5, 0.4, 0.4, 0.4),
-  corPar = c(4, 4, 4, 6, 6, 6),
+  sigPar = 1/c(2, 2, 2, 4, 4, 4),
+  tauPar = rep(0, 6),
+  corPar = 1/c(4, 4, 4, 6, 6, 6),
   nu1 = NULL,
   nu2 = NULL,
   tmp_bt1 = NULL,
@@ -20,7 +20,7 @@ createSimuData(
   beta1 = 0,
   beta2 = 0,
   seed = NULL,
-  tempPar = 1
+  tempPar = 0
 )
 }
 \arguments{

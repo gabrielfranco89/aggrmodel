@@ -138,7 +138,7 @@ plotFitted_cluster <- function(object,
                        obsAlpha = .5,
                        predColor = 'magenta'){
     require(ggplot2)
-    dd <- object$predData
+    dd <- object$fitted
     p <- dd %>% ggplot(aes(x=time,y=y, group=rep)) +
         geom_line(alpha=obsAlpha) +
         geom_line(aes(y=pred), col=predColor) +
