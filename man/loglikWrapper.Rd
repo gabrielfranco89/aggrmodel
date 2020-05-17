@@ -15,6 +15,8 @@ loglikWrapper(
   designWrap,
   optWrap = TRUE,
   nCons,
+  parallel = FALSE,
+  nCores = parallel::detectCores() - 1,
   nBasisCov,
   nOrderCov,
   verbWrap,
@@ -43,6 +45,10 @@ loglikWrapper(
 \item{optWrap}{Optmization criterion should be via sample cov. matrix (TRUE) or via likelihood (more sensitive)}
 
 \item{nCons}{number of types of consumers}
+
+\item{parallel}{TRUE/FALSE if computation should be parallel}
+
+\item{nCores}{Number of clusters. Default: parallel::detectCores()}
 
 \item{nBasisCov}{number of basis functions for functional variance}
 

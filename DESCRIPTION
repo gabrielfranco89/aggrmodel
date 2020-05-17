@@ -14,11 +14,14 @@ LazyData: true
 ByteCompile: true
 RoxygenNote: 7.0.2
 Imports:
-     Matrix,
-     dplyr,
-     fda,
-     ggplot2,
-     MASS,
-     mvtnorm,
-     purrr,
-     tidyr
+    Matrix,
+    dplyr,
+    fda,
+    ggplot2,
+    MASS,
+    purrr,
+    tidyr,
+    mvnfast
+Suggests: 
+    foreach,
+    parallel

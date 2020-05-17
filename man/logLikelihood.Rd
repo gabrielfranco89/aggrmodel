@@ -4,7 +4,7 @@
 \alias{logLikelihood}
 \title{Compute log-likelihood for aggregated model}
 \usage{
-logLikelihood(data, muVec, covMtxList)
+logLikelihood(data, muVec, covMtxList, doPar = FALSE, nc = NULL)
 }
 \arguments{
 \item{data}{Data Frame with 4 columns in the following order: Group, Replicates, Time, Signal}
@@ -12,6 +12,10 @@ logLikelihood(data, muVec, covMtxList)
 \item{muVec}{Vector \eqn{X\beta} of fitted values}
 
 \item{covMtxList}{List of covariance matrices for each group}
+
+\item{doPar}{TRUE/FALSE if computation should be parallel}
+
+\item{nc}{Number of clusters. Default: parallel::detectCores()}
 }
 \value{
 Log-likehood value

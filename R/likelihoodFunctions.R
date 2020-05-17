@@ -87,17 +87,24 @@ buildX <- function(marketLong,
 #' @param data Data Frame with 4 columns in the following order: Group, Replicates, Time, Signal
 #' @param muVec Vector \eqn{X\beta} of fitted values
 #' @param covMtxList List of covariance matrices for each group
+#' @param doPar TRUE/FALSE if computation should be parallel
+#' @param nc Number of clusters. Default: parallel::detectCores()
 #'
 #' @return Log-likehood value
 #' @importFrom mvnfast dmvn
+#' @import parallel
+#' @import foreach
 #' @export
 logLikelihood <- function(data,
                           muVec,
-                          covMtxList){
+                          covMtxList,
+                          doPar = FALSE,
+                          nc = NULL){
     data$flag <- as.factor(paste(data$rep,data$group))
     data$flag <- as.integer(data$flag)
     data$mu <- muVec
     cholSig <- lapply(covMtxList, chol)
+    if(!doPar){
     lk <- by(data = data,
                 INDICES = data$flag,
                 FUN = function(dt){
@@ -110,6 +117,24 @@ logLikelihood <- function(data,
                                   isChol=TRUE,
                                   log=TRUE)
                 })
+    }
+    if(doPar){
+      fUni <- unique(data$flag)
+      cl <- parallel::makeForkCluster(nc)
+      doParallel::registerDoParallel(cl)
+      lk <- foreach(f = seq_along(fUni), .combine = 'c') %dopar% {
+        dt <- subset(data, flag==fUni[f])
+        jj <- dt$group[1]
+        actualMu <- dt$mu
+        actualSigma <- covMtxList[[jj]]
+        mvnfast::dmvn(X = dt$y,
+                               mu = dt$mu,
+                               sigma = cholSig[[jj]],
+                               isChol=TRUE,
+                               log=TRUE)
+      }
+      parallel::stopCluster(cl)
+    }
     -sum(unlist(lk))
 }
 
@@ -125,6 +150,8 @@ logLikelihood <- function(data,
 #' @param betaWrap beta parameter
 #' @param designWrap Design matrix
 #' @param nCons number of types of consumers
+#' @param parallel TRUE/FALSE if computation should be parallel
+#' @param nCores Number of clusters. Default: parallel::detectCores()
 #' @param nBasisCov number of basis functions for functional variance
 #' @param nOrderCov order of basis functions for functional variance
 #' @param verbWrap TRUE/FALSE prints likelihood values during optimization
@@ -144,6 +171,8 @@ loglikWrapper <- function(pars,
                           designWrap,
                           optWrap = TRUE,
                           nCons,
+                          parallel = FALSE,
+                          nCores = parallel::detectCores()-1,
                           nBasisCov,
                           nOrderCov, ## for heterog model
                           verbWrap,
@@ -243,7 +272,9 @@ loglikWrapper <- function(pars,
         ## Loglik ----
         lk <- logLikelihood(data = dataWrap,
                             muVec = mu,
-                            covMtxList = sigmaList
+                            covMtxList = sigmaList,
+                            doPar = parallel,
+                            nc = nCores
         )
         if(is.infinite(lk))
             lk <- .Machine$double.xmax

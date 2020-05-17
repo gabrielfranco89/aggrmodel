@@ -30,6 +30,8 @@
 #' @param betaCov_init Inital values for variance functional expansion
 #' @param positive_restriction TRUE/FALSE if mean curves are strictly positive
 #' @param optimMethod Choose optim method (Default: L-BFGS-B)
+#' @param use_parallel TRUE/FALSE if computation should be parallel
+#' @param n_cores Number of clusters. Default: parallel::detectCores()
 #' @param truncateDec Decimal to be truncated at covariance matrix
 #' @param optSampleCovMatrix Optmization criterion via sample covariance matrix convergence (TRUE and default) or via likelihood (more sensitive)
 #' @param optVerbose Print parameters while in optmization
@@ -37,12 +39,32 @@
 #'
 #' @return An aggrmodel object
 #' @examples
-#' df = simuData
-#' mkt = attr(df, "market")
-#' df = subset(df, cluster==2)
-#' mkt = subset(mkt, group %in% unique(df$group))
 #'
-#' aggrFit = aggrmodel(data = df, market = mkt, Y = y, timeVar = time, groupVar = group, corType = 'exponential',repVar = rep, n_basis = 7)
+#' set.seed(81453)
+#' df <- createSimuData(B1 = 8,
+#'                     nRep=10)
+#'
+#' mkt <- attr(df,"market")
+#'df <- subset(df, group <= 8) # get only cluster 1
+#'mkt <- subset(mkt,group<=8)
+#'
+#'fit <-
+#'  aggrmodel(
+#'    data = df,
+#'    market = mkt,
+#'    Y = obs,
+#'    timeVar = time,
+#'    groupVar = group,
+#'    repVar = rep,
+#'    n_basis = 8,
+#'    covType = "Homog_Uniform",
+#'    corType = "exponential",
+#'    returnFitted = TRUE,
+#'    use_parallel = TRUE
+#'  )
+#'
+#'plot(fit)
+#'
 #' @import Matrix
 #' @export
 
@@ -72,6 +94,8 @@ aggrmodel <- function(formula=NULL,
                       returnFitted = TRUE,
                       positive_restriction = FALSE,
                       optimMethod = "L-BFGS-B",
+                      use_parallel = FALSE,
+                      n_cores = parallel::detectCores()-1,
                       truncateDec = NULL,
                       verbose = FALSE,
                       optVerbose = FALSE,
@@ -224,6 +248,8 @@ aggrmodel <- function(formula=NULL,
                      method = optimMethod,
                      nBasisCov = n_basis_cov,
                      nOrderCov = n_order,
+                     parallel = use_parallel,
+                     nCores = n_cores,
                      truncateDec = truncateDec,
                      positive = positive_restriction,
                      cicle = cicleRep,

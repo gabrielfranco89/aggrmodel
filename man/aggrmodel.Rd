@@ -31,6 +31,8 @@ aggrmodel(
   returnFitted = TRUE,
   positive_restriction = FALSE,
   optimMethod = "L-BFGS-B",
+  use_parallel = FALSE,
+  n_cores = parallel::detectCores() - 1,
   truncateDec = NULL,
   verbose = FALSE,
   optVerbose = FALSE,
@@ -92,6 +94,10 @@ aggrmodel(
 
 \item{optimMethod}{Choose optim method (Default: L-BFGS-B)}
 
+\item{use_parallel}{TRUE/FALSE if computation should be parallel}
+
+\item{n_cores}{Number of clusters. Default: parallel::detectCores()}
+
 \item{truncateDec}{Decimal to be truncated at covariance matrix}
 
 \item{verbose}{TRUE/FALSE prints likelihood values during optimization}
@@ -111,10 +117,30 @@ An aggrmodel object
 Fit Aggregated Model
 }
 \examples{
-df = simuData
-mkt = attr(df, "market")
-df = subset(df, cluster==2)
-mkt = subset(mkt, group \%in\% unique(df$group))
 
-aggrFit = aggrmodel(data = df, market = mkt, Y = y, timeVar = time, groupVar = group, corType = 'exponential',repVar = rep, n_basis = 7)
+set.seed(81453)
+df <- createSimuData(B1 = 8,
+                    nRep=10)
+
+mkt <- attr(df,"market")
+df <- subset(df, group <= 8) # get only cluster 1
+mkt <- subset(mkt,group<=8)
+
+fit <-
+ aggrmodel(
+   data = df,
+   market = mkt,
+   Y = obs,
+   timeVar = time,
+   groupVar = group,
+   repVar = rep,
+   n_basis = 8,
+   covType = "Homog_Uniform",
+   corType = "exponential",
+   returnFitted = TRUE,
+   use_parallel = TRUE
+ )
+
+plot(fit)
+
 }
