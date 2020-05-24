@@ -71,7 +71,7 @@ get_inits <- function(X, I, data, C,
             n_basis_cov <- n_basis
         }
         if(is.null(betaCov_init)){
-             betaCov_init <- rep(sigma_fit, C*n_basis_cov)
+             betaCov_init <- rep(log(sigma_fit), C*n_basis_cov)
         }
         else{
             if(length(betaCov_init)!=C*n_basis_cov) stop("betaCov_init must have the same length as number of basis for covariance")
@@ -82,7 +82,7 @@ get_inits <- function(X, I, data, C,
             corPar <- corPar_init
         parIn <- c(betaCov_init,
                    corPar)
-        lowBoundVec <- c(rep(1e-8,times=(C*n_basis_cov)), ##beta
+        lowBoundVec <- c(rep(-Inf,times=(C*n_basis_cov)), ##beta
                          rep(1e-4,C)) ## corPar
         ubCor <- ifelse(is.null(truncateDec), Inf, log(10^truncateDec))
         upperBoundVec <- c(rep(Inf,times=(C*n_basis_cov)),

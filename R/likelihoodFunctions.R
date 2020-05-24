@@ -230,7 +230,7 @@ loglikWrapper <- function(pars,
                                         norder = nOrderCov)
         B <- predict(basisObj, tvec)
         betaMC <- pars[1:(C*nBasisCov)]
-        funcVarIn <- B %*% matrix(betaMC, ncol=C)
+        funcVarIn <- exp( B %*% matrix(betaMC, ncol=C) )
         # funcVarIn <- exp(funcVarIn)
         # sigParIn <- pars[(C*nBasisCov+1):(length(pars)-(2*C))]
         corParIn <- pars[(C*nBasisCov+1):length(pars)]

@@ -311,16 +311,8 @@ aggrmodel <- function(formula=NULL,
                                                 norder = n_order)
                 B <- predict(basisObj, tvec)
                 betaMC <- parOut[1:(C*n_basis_cov)]
-                funcVarIn <- B%*% matrix(betaMC,ncol=C)
-                # betaMtx <- cbind(beta=as.matrix(betaMC),
-                #                  type=rep(1:C, each=n_basis_cov))
-                # mcMtx <- tapply(betaMtx[,1],
-                #                 betaMtx[,2],
-                #                 function(x) exp(B %*% x))
-                # funcVarIn <- matrix(unlist(mcMtx), ncol = C)
-                # sigParIn <- parOut[(C*n_basis_cov+1):(length(parOut)-(2*C))]
+                funcVarIn <- exp( B%*% matrix(betaMC,ncol=C) )
                 corParIn <- parOut[(C*n_basis_cov+1):(length(parOut))]
-                # tauParIn  <- parOut[((length(parOut)-C+1):length(parOut))]
                 sigmaOutList <- covMatrix(market = market,
                                           group.name = 'group',
                                           type.name = 'type',
@@ -552,9 +544,9 @@ aggrmodel <- function(formula=NULL,
         betaCov <- parOut[1:(C*n_basis_cov)]
         betaCov_lwr <- betaCov - qnorm(.975)*outList[["parsSE"]][1:(C*n_basis_cov)]
         betaCov_upr <- betaCov + qnorm(.975)*outList[["parsSE"]][1:(C*n_basis_cov)]
-        ddCov <- data.frame(funcVar = c( B %*% matrix(betaCov, ncol=C)),
-                            funcVar_lwr = c( B %*% matrix(betaCov_lwr, ncol=C)),
-                            funcVar_upr = c( B %*% matrix(betaCov_upr, ncol=C)),
+        ddCov <- data.frame(funcVar = c( exp( B %*% matrix(betaCov, ncol=C))),
+                            funcVar_lwr = c( exp( B %*% matrix(betaCov_lwr, ncol=C))),
+                            funcVar_upr = c(exp( B %*% matrix(betaCov_upr, ncol=C))),
                             type = rep(1:C, each=length(tvec)),
                             time = rep(tvec,times=C)
         )
