@@ -364,14 +364,14 @@ Q_function <- function(data,sigmaList,xbetaList,probTab,B){
     for(j in unique(data$group)){
         for(i in unique(data$rep)){
              for(b in 1:B){
-                 prob_ijb <- probTab[probTab$grps==j&probTab$reps==i,b+2]
-                prob_ijb <- as.numeric(prob_ijb)
-                 logLikOut <- logLikOut +
-                  prob_ijb* mvnfast::dmvn(X =data[data$group==j&data$rep==i,"y"],
-                                          mu =  xbetaList[[j]][,b],
-                                          sigma =as.matrix(cholList[[b]][[j]]),
-                                          isChol=TRUE,
-                                          log=TRUE)
+               prob_ijb <- probTab[j,c(b+1)]#probTab[probTab$grps==j&probTab$reps==i,b+2]
+               prob_ijb <- as.numeric(prob_ijb)
+               logLikOut <- logLikOut +
+                 prob_ijb* mvnfast::dmvn(X =data[data$group==j&data$rep==i,"y"],
+                                         mu =  xbetaList[[j]][,b],
+                                         sigma =as.matrix(cholList[[b]][[j]]),
+                                         isChol=TRUE,
+                                         log=TRUE)
             } # end for b
         } # end for i
     } # end for j
