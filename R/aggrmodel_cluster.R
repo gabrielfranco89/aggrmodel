@@ -119,7 +119,7 @@ aggrmodel_cluster <- function(formula=NULL,
     sigPar_init <- rep(mean(sqrt(c(sigPar_init))), times=B)
     if(covType=="Homog") sigPar_init <- rep(sigPar_init,C)
   } else
-    if(!all(length(sigPar_init)==B,length(sigPar_init==C*B)))
+    if(!any(length(sigPar_init)==B,length(sigPar_init==C*B)))
       stop(paste0("sigPar_init must have length ",B," or ",C*B))
   if(is.null(corPar_init)){
     corPar_init <- rep(1,times=B)
@@ -127,7 +127,7 @@ aggrmodel_cluster <- function(formula=NULL,
       corPar_init <- rep(corPar_init,times=C)
   }
   else
-    if(!all(length(corPar_init)==B,length(corPar_init==C*B)))
+    if(!any(length(corPar_init)==B,length(corPar_init==C*B)))
       stop(paste0("corPar_init must have length ",B," or ",C*B))
   cp_in <- c(sigPar_init,corPar_init)
   # pi_init <- prop.table(table(cluster_init[,2]))
