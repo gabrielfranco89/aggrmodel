@@ -124,7 +124,7 @@ aggrmodel_cluster <- function(formula=NULL,
   if(is.null(corPar_init)){
     corPar_init <- rep(1,times=B)
     if(covType=="Homog")
-      covPar_init <- rep(corPar_init,times=C)
+      corPar_init <- rep(corPar_init,times=C)
   }
   else
     if(!all(length(corPar_init)==B,length(corPar_init==C*B)))
