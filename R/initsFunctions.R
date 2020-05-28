@@ -35,7 +35,7 @@ get_inits <- function(X, I, data, C,
     ## Get beta init -----------------------------
     fit_init <- lm(data$y~X-1)
     beta_init <- coef(fit_init)
-    sigma_fit <- sqrt(summary(fit_init)$sigma/(I))
+    sigma_fit <- summary(fit_init)$sigma/sqrt(I)
 
     if(covType == 'Homog_Uniform'){
         sigPar <- ifelse(is.null(sigPar_init), sigma_fit, sigPar_init)

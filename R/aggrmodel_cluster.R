@@ -115,8 +115,8 @@ aggrmodel_cluster <- function(formula=NULL,
   beta_init <- unlist(lapply(cl_init[[2]],coef))
   beta_init <- matrix(beta_init, ncol=B)
   if(is.null(sigPar_init)){
-    sigPar_init <- unlist(lapply(cl_init[[2]],function(x) summary(x)$sigma))
-    sigPar_init <- rep(mean(sqrt(c(sigPar_init))), times=B)
+    sigPar_init <- unlist(lapply(cl_init[[2]],function(x) summary(x)$sigma))/sqrt(I)
+    sigPar_init <- rep(mean(c(sigPar_init)), times=B)
     if(covType=="Homog") sigPar_init <- rep(sigPar_init,C)
   } else
     if(!any(length(sigPar_init)==B,length(sigPar_init==C*B)))
@@ -347,14 +347,13 @@ aggrmodel_cluster <- function(formula=NULL,
       for(j in 1:J){
         x_sinv <- t(X[[j]]) %*% sigInvList[[j]]
         mainLeft <- x_sinv %*%  X[[j]]
+        pjb <- probTab[j,c(b+1)] #subset(probTab,subset = reps==i & grps==j)[,c(2+b)]
+        tmpLeft <- tmpLeft + I*pjb*mainLeft
         for(i in 1:I){
-          pijb <- probTab[j,c(b+1)] #subset(probTab,subset = reps==i & grps==j)[,c(2+b)]
           yij <- matrix( dd[dd$group==j&dd$rep==i,"y"], ncol=1)
-          tmpLeft <- tmpLeft + pijb*mainLeft
-          tmpRight <- tmpRight + pijb*(x_sinv %*% yij)
-
-          bij <- pijb*x_sinv
-          se <- se + bij %*% sigMtxList_out[[b]][[j]]%*% t(bij)
+          tmpRight <- tmpRight + pjb*(x_sinv %*% yij)
+          bj <- pjb*x_sinv
+          se <- se + bj %*% sigMtxList_out[[b]][[j]]%*% t(bj)
         } # end for i
       } # end for j
       inv_tl <- solve(tmpLeft)
@@ -396,12 +395,11 @@ aggrmodel_cluster <- function(formula=NULL,
         beta_out[,b] <- as.numeric(solve(tmpLeft,tmpRight))
       } ## end if/else cicle
     }
-
     pi_out <- probTab[,-1]
     # pi_out <- apply(probTab[,-c(1:2)],2,mean)
     xbeta_out <- lapply(X, function(x)  x %*% beta_out)
     ## Check convergence & updates
-     lkDiff <- abs(lkIn - lkOut)
+    lkDiff <- abs(lkIn - lkOut)
     beta_init <- beta_out
     pi_init <- pi_out
     cp_in <- cp_out
