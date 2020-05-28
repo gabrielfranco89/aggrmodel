@@ -59,8 +59,9 @@ plot.aggrmodel <- function(object, scales = 'fixed', CI = TRUE, sub_temp=TRUE, t
         geom_line()
       if(CI)
         p <- p +
-        geom_line(aes(x=time, y=mc_lwr), linetype=2, alpha = .4)+
-        geom_line(aes(x=time, y=mc_upr), linetype=2, alpha = .4)
+        geom_ribbon(aes(ymin = mc_lwr,ymax = mc_upr), alpha=.33)
+      # geom_line(aes(x=time, y=mc_lwr), linetype=2, alpha = .4)+
+      #   geom_line(aes(x=time, y=mc_upr), linetype=2, alpha = .4)
       p + facet_wrap(type~time2, scales = scales, labeller = label_both)
     }
 }
@@ -115,14 +116,15 @@ plotFitted <- function(object,
 #' n_cluster = 2,n_trials = 1000, n_order = 4, corType = 'periodic', verbose=TRUE)
 #'
 #' plot(fitCluster)
-plot.aggrmodel_cluster <- function(object,scales='fixed',IC=TRUE){
+plot.aggrmodel_cluster <- function(object,scales='fixed',CI=TRUE){
   require(ggplot2)
   p <- object$mc %>%
     ggplot(aes(x=time,y=mc)) +
     geom_line()
-  if(IC) p <- p +
-    geom_line(aes(x=time, y=mc_lwr), linetype=2, alpha = .4)+
-    geom_line(aes(x=time, y=mc_upr), linetype=2, alpha = .4)
+  if(CI) p <- p +
+    geom_ribbon(aes(ymin = mc_lwr,ymax = mc_upr), alpha=.33)
+    # geom_line(aes(x=time, y=mc_lwr), linetype=2, alpha = .4)+
+    # geom_line(aes(x=time, y=mc_upr), linetype=2, alpha = .4)
   p + facet_grid(cluster~type, scales=scales)
 
 }

@@ -62,6 +62,7 @@ aggrmodel_cluster <- function(formula=NULL,
                               optMethod = "L-BFGS-B",
                               returnFitted = FALSE,
                               optLk = TRUE,
+                              sigPar_init = NULL,
                               corPar_init = NULL,
                               diffTol = 1e-6,
                               itMax = 100,
@@ -113,18 +114,22 @@ aggrmodel_cluster <- function(formula=NULL,
   cluster_init <- cl_init[[1]]
   beta_init <- unlist(lapply(cl_init[[2]],coef))
   beta_init <- matrix(beta_init, ncol=B)
-  sigPar_init <- unlist(lapply(cl_init[[2]],function(x) summary(x)$sigma))
-  sigPar_init <- matrix(sqrt(sigPar_init), ncol=B)
-  if(is.null(corPar_init))
-    corPar_init <- matrix(1, ncol=B)
+  if(is.null(sigPar_init)){
+    sigPar_init <- unlist(lapply(cl_init[[2]],function(x) summary(x)$sigma))
+    sigPar_init <- rep(mean(sqrt(c(sigPar_init))), times=B)
+    if(covType=="Homog") sigPar_init <- rep(sigPar_init,C)
+  } else
+    if(!all(length(sigPar_init)==B,length(sigPar_init==C*B)))
+      stop(paste0("sigPar_init must have length ",B," or ",C*B))
+  if(is.null(corPar_init)){
+    corPar_init <- rep(1,times=B)
+    if(covType=="Homog")
+      covPar_init <- rep(corPar_init,times=C)
+  }
   else
-    corPar_init <- matrix(corPar_init, ncol=B)
-  if(covType == 'Homog_Uniform'){
-    cp_in <- c(sigPar_init,corPar_init)
-  }
-  if(covType == 'Homog'){
-    cp_in <- c(rep(sigPar_init,C),rep(c(corPar_init),C))
-  }
+    if(!all(length(corPar_init)==B,length(corPar_init==C*B)))
+      stop(paste0("corPar_init must have length ",B," or ",C*B))
+  cp_in <- c(sigPar_init,corPar_init)
   # pi_init <- prop.table(table(cluster_init[,2]))
   # pi_init <- matrix(pi_init, ncol=B)
   pi_init <- matrix(nrow=J,ncol=B)
@@ -188,32 +193,29 @@ aggrmodel_cluster <- function(formula=NULL,
       })
     }
     xbeta <- lapply(X, function(x)  x %*% beta_init)
-    preprobTab <- data.frame(
-      reps = rep(1:I, times=J),
-      grps =  rep(1:J, each=I)
-    )
-    preprobTab <- cbind(preprobTab, matrix(nrow=I*J,ncol=B))
-    probTab <- matrix(nrow=J,ncol=B+1)
+    ## Posteriori probability --------------------------------------------------
+    probTab <- matrix(nrow=J,ncol=c(B+1))
     probTab[,1] <- 1:J
+    dens_b <- matrix(nrow=I*J,ncol=B)
     for(b in 1:B){
-      tmp <- by(data = dd,INDICES = grp_rep,FUN = function(df){
-        j <- df$group[1]
-        i <- df$rep[1]
-        fyij <- mvnfast::dmvn(X = as.numeric(df$y),
-                      mu = as.numeric(c(xbeta[[j]][,b])),
-                      sigma = as.matrix(sigMtxList[[b]][[j]]),
-                      log=FALSE)
-        pi_init[j,b]*fyij
-      })
-      # probTab[,c(2+b)] <- pi_init[j,b]*exp(as.numeric(tmp))
-      preprobTab[,c(2+b)] <- as.numeric(tmp)
-      probTab[,c(1+b)] <- tapply(preprobTab[,c(2+b)],
-                                 preprobTab[,1],
-                                 prod)
-    }
-    denom <- apply(probTab[,-c(1)],1,sum)
-    for(b in 1:B)  probTab[,c(1+b)] <- probTab[,c(1+b)]/denom
-    ## M-Step -----------------------------------------------------------------
+      densities <- by(data = dd,INDICES = rep(1:c(I*J),each=T),FUN = function(dt){
+        j <- dt$group[1]
+        mvnfast::dmvn(
+          X = dt$y,
+          mu = xbeta[[j]][,b],
+          sigma = sigMtxList[[b]][[j]],
+          log = FALSE
+        )
+      }) # end by
+      if(b==1) my_constant <- 1/sd(densities)
+      densities <- as.numeric(densities) * my_constant
+      p_jb <- tapply(X = densities,INDEX = rep(1:J,each=I),FUN = prod)
+      numerator <- p_jb * pi_init[,b]
+      probTab[,c(b+1)] <- numerator
+    } # end for b
+    denominator_j <- apply(X = probTab[,-1],MARGIN = 1,FUN = sum)
+    for(b in 1:B) probTab[,c(b+1)] <- probTab[,c(b+1)]/denominator_j
+    ## M-Step ==================================================================
     if(optLk){
       sigma_hat = NULL
     } else{
@@ -319,12 +321,6 @@ aggrmodel_cluster <- function(formula=NULL,
                          truncateDec = 8)
         sig
       })
-      # sigLongList <- lapply(sigMtxList_out,
-      #                       function(m){
-      #                         mtx <- lapply(m,function(x) Matrix::bdiag(replicate(n=I,x,simplify=FALSE)))
-      #                         mtx <- Matrix::bdiag(mtx)
-      #                         mtx
-      #                       })
     }
     if(covType=='Homog'){
       covPar <- matrix(cp_out, ncol=B,byrow=TRUE)
@@ -338,18 +334,7 @@ aggrmodel_cluster <- function(formula=NULL,
                          truncateDec = 8)
         sig
       })
-      # sigLongList <- lapply(sigMtxList_out,
-      #                       function(m){
-      #                         mtx <- lapply(m,function(x) Matrix::bdiag(replicate(n=I,x,simplify=FALSE)))
-      #                         mtx <- Matrix::bdiag(mtx)
-      #                         mtx
-      #                       })
     }
-    # probLong <- list()
-    # probTab2 <- probTab[order(probTab[,2], probTab[,1]),]
-    #     for(b in 1:B){
-    #       probLong[[b]] <- diag(rep(probTab2[,b+2],each=T))
-    #     }
     ## COMPUTE BETAs ----
     betaSE <- beta_out <- beta_init ## initiate
     for(b in 1:B){
@@ -368,12 +353,6 @@ aggrmodel_cluster <- function(formula=NULL,
 
           bij <- pijb*x_sinv
           se <- se + bij %*% sigMtxList_out[[b]][[j]]%*% t(bij)
-
-      # tmpLeft <- t(XLong)%*%probLong[[b]]%*%
-      #   Matrix::solve(sigLongList[[b]],XLong)
-      # tmpRight <- t(XLong)%*%probLong[[b]]%*%
-      #   Matrix::solve(sigLongList[[b]],matrix(y,ncol=1))
-
         } # end for i
       } # end for j
       inv_tl <- solve(tmpLeft)
@@ -415,35 +394,12 @@ aggrmodel_cluster <- function(formula=NULL,
         beta_out[,b] <- as.numeric(solve(tmpLeft,tmpRight))
       } ## end if/else cicle
     }
-    # for(b in 1:B){
-    #   pi_out[,b] <- tapply(probTab[,2+b],
-    #                        probTab$grps,
-    #                        mean,
-    #                        simplify = TRUE)
-    # }
+
     pi_out <- probTab[,-1]
     # pi_out <- apply(probTab[,-c(1:2)],2,mean)
     xbeta_out <- lapply(X, function(x)  x %*% beta_out)
-
     ## Check convergence & updates
-    # if(!optLk){
-    #   lk_part <- matrix(nrow=I*J,ncol=B)
-    #    for(b in 1:B){
-    #      tmp <- by(data = dd,INDICES = grp_rep,FUN = function(df){
-    #        j <- df$group[1]
-    #        i <- df$rep[1]
-    #        mvtnorm::dmvnorm(x = as.numeric(df$y),
-    #                         mean = as.numeric(c(xbeta_out[[j]][,b])),
-    #                         sigma = as.matrix(sigMtxList_out[[b]][[j]]),
-    #                         log=FALSE)
-    #      })
-    #      lk_part[,b] <- pi_out[b]*as.numeric(tmp)
-    #    }
-    #   lk <- as.numeric(apply(lk_part,1,sum))
-    #   lkOut <- sum(log(lk))
-    #   if(verbose) message("lk value:",lkOut)
-    # }
-    lkDiff <- abs(lkIn - lkOut)
+     lkDiff <- abs(lkIn - lkOut)
     beta_init <- beta_out
     pi_init <- pi_out
     cp_in <- cp_out
@@ -452,28 +408,11 @@ aggrmodel_cluster <- function(formula=NULL,
     lkIn <- lkOut
   } # end while loop
   ## OUTPUTS ----
-  # predList <- apply(beta_out,2,function(b) XLong %*% b)
-  # predList <- unlist(predList)
-  # predList <- matrix(predList, ncol=B)
   predList <- XLong %*% beta_out
   pizao <- apply(pi_out,2,rep,each=T*I)
   pred <- numeric(nrow(dd))
   for(b in 1:B)
     pred <- pred + predList[,b]*pizao[,b]
-  #
-  # predListNames <- paste("cluster",1:B,sep='')
-  # colnames(predList) <- predListNames
-  # ddOut <- cbind(dd,predList)
-  # probTab <- as.data.frame(probTab)
-  # colnames(probTab)[1:2] <- c('rep','group')
-  # ddOut <- merge(ddOut, probTab)
-  # ec <- ncol(ddOut)
-  # colnames(ddOut)[(ec-B+1):ec] <- paste('p',1:B,sep='')
-  # mm<- apply(ddOut[,(ec-B+1):ec],1,which.max)
-  # pred <- numeric(nrow(ddOut))
-  # for(k in 1:nrow(ddOut)){
-  #   pred[k]<-ddOut[k,(mm[k]+4)]
-  # }
   dd$pred <- pred
   dd$group <- as.factor(dd$group)
   levels(dd$group) <- levels(grps)
@@ -492,13 +431,6 @@ aggrmodel_cluster <- function(formula=NULL,
   tuni <- unique(t)
   basisMtx = predict(basisObj, tuni)
   basisMtx <- Matrix::bdiag(replicate(C,basisMtx,simplify = FALSE))
-  # betaSE <- matrix(nrow=nrow(beta_out),
-  #                  ncol=B)
-  # for(b in 1:B){
-  #   sigmaum <- sigLongList[[b]]
-  #   betaMult <- solve(tmpLeft, t(XLong)%*% probLong[[b]])%*%solve(sigmaum)
-  #   betaSE[,b] <- sqrt(diag(betaMult%*%sigmaum%*%t(betaMult)))
-  # }
   beta_lwr <- beta_out - qnorm(.975)*betaSE
   beta_upr <- beta_out + qnorm(.975)*betaSE
   mc_lwr <- basisMtx %*% beta_lwr

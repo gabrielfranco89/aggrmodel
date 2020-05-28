@@ -359,23 +359,49 @@ gradLK <- function(x, dataWrap,mktWrap,sCovWrap,covWrap,corWrap,betaWrap,
 #' @export
 #' @importFrom mvnfast dmvn
 Q_function <- function(data,sigmaList,xbetaList,probTab,B){
-    logLikOut=0
+    loglk = 0
     cholList <- lapply(sigmaList, function(x) lapply(x,chol))
-    for(j in unique(data$group)){
-        for(i in unique(data$rep)){
-             for(b in 1:B){
-               prob_ijb <- probTab[j,c(b+1)]#probTab[probTab$grps==j&probTab$reps==i,b+2]
-               prob_ijb <- as.numeric(prob_ijb)
-               logLikOut <- logLikOut +
-                 prob_ijb* mvnfast::dmvn(X =data[data$group==j&data$rep==i,"y"],
-                                         mu =  xbetaList[[j]][,b],
-                                         sigma =as.matrix(cholList[[b]][[j]]),
-                                         isChol=TRUE,
-                                         log=TRUE)
-            } # end for b
-        } # end for i
-    } # end for j
-    -logLikOut ## minus for maximization
+    I <- max(data$rep)
+    J <- max(data$group)
+    id_grp_rep <- rep(1:c(I*J), each=length(unique(data$time)))
+    for(b in 1:B){
+      densities <-
+        by(
+          data = data,
+          INDICES = id_grp_rep,
+          FUN = function(dt) {
+            i <- dt$rep[1]
+            j <- dt$group[1]
+            mvnfast::dmvn(
+              X = dt$y,
+              mu = xbetaList[[j]][, b],
+              sigma = as.matrix(cholList[[b]][[j]]),
+              isChol = TRUE,
+              log = TRUE
+            )
+          }
+        ) # end by
+      densities <- as.numeric(densities)
+      densities_j <- tapply(X = densities,INDEX = rep(1:J, each=I),FUN = sum)
+      loglk <- loglk + sum( densities_j * probTab[,c(b+1)])
+    }
+    -loglk
+    #
+    # for(j in unique(data$group)){
+    #     for(i in unique(data$rep)){
+    #          for(b in 1:B){
+    #            prob_ijb <- probTab[j,c(b+1)]#probTab[probTab$grps==j&probTab$reps==i,b+2]
+    #            prob_ijb <- as.numeric(prob_ijb)
+    #            logLikOut <- logLikOut +
+    #              prob_ijb* mvnfast::dmvn(X =data[data$group==j&data$rep==i,"y"],
+    #                                      mu =  xbetaList[[j]][,b],
+    #                                      sigma =as.matrix(cholList[[b]][[j]]),
+    #                                      isChol=TRUE,
+    #                                      log=TRUE)
+    #         } # end for b
+    #     } # end for i
+    # } # end for j
+    # -logLikOut ## minus for maximization
 }
 
 
