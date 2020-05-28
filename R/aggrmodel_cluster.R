@@ -198,7 +198,7 @@ aggrmodel_cluster <- function(formula=NULL,
     probTab[,1] <- 1:J
     dens_b <- matrix(nrow=I*J,ncol=B)
     for(b in 1:B){
-      densities <- by(data = dd,INDICES = rep(1:c(I*J),each=T),FUN = function(dt){
+      dens_b[,b] <- by(data = dd,INDICES = rep(1:c(I*J),each=T),FUN = function(dt){
         j <- dt$group[1]
         mvnfast::dmvn(
           X = dt$y,
@@ -207,12 +207,14 @@ aggrmodel_cluster <- function(formula=NULL,
           log = FALSE
         )
       }) # end by
-      if(b==1) my_constant <- 1/sd(densities)
-      densities <- as.numeric(densities) * my_constant
-      p_jb <- tapply(X = densities,INDEX = rep(1:J,each=I),FUN = prod)
+    } # end for b
+    my_constant <- 1/apply(dens_b,1,median)
+    for(b in 1:B){
+      dens_b[,b] <- dens_b[,b]*my_constant
+      p_jb <- tapply(X = dens_b[,b],INDEX = rep(1:J,each=I),FUN = prod)
       numerator <- p_jb * pi_init[,b]
       probTab[,c(b+1)] <- numerator
-    } # end for b
+    }
     denominator_j <- apply(X = probTab[,-1],MARGIN = 1,FUN = sum)
     for(b in 1:B) probTab[,c(b+1)] <- probTab[,c(b+1)]/denominator_j
     ## M-Step ==================================================================
