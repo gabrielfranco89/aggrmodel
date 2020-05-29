@@ -386,23 +386,7 @@ Q_function <- function(data,sigmaList,xbetaList,probTab,B){
       loglk <- loglk + sum( densities_j * probTab[,c(b+1)])
     }
     -loglk
-    #
-    # for(j in unique(data$group)){
-    #     for(i in unique(data$rep)){
-    #          for(b in 1:B){
-    #            prob_ijb <- probTab[j,c(b+1)]#probTab[probTab$grps==j&probTab$reps==i,b+2]
-    #            prob_ijb <- as.numeric(prob_ijb)
-    #            logLikOut <- logLikOut +
-    #              prob_ijb* mvnfast::dmvn(X =data[data$group==j&data$rep==i,"y"],
-    #                                      mu =  xbetaList[[j]][,b],
-    #                                      sigma =as.matrix(cholList[[b]][[j]]),
-    #                                      isChol=TRUE,
-    #                                      log=TRUE)
-    #         } # end for b
-    #     } # end for i
-    # } # end for j
-    # -logLikOut ## minus for maximization
-}
+  }
 
 
 #' Wrapper for M-Step function evaluation
@@ -427,11 +411,10 @@ Q_function <- function(data,sigmaList,xbetaList,probTab,B){
 #' @return
 #' @export
 Q_wrapper <- function(covPar,data,market,
-                      piPar,
+                      # piPar,
                       pTab,
-                      optWrap,
-                      sCovList,
-                      B,t,K,C,I,J,
+                      B,t,#K,
+                      C,#I,J,
                       basisFunction,n_order,
                       xbeta,
                       covWrap, corWrap){
@@ -462,24 +445,10 @@ Q_wrapper <- function(covPar,data,market,
         })
     }
     ## SEND TO Q_Function
-      if(!optWrap){
-          out <- numeric(B)
-          for(b in 1:B){
-              sigmaList <- sigMtxList[[b]]
-              sCovWrap <- sCovList[[b]]
-              # Compute diff between sample cov and model cov ------
-              diffList <- purrr::map2(sigmaList, sCovWrap, `-`)
-              diffList <- lapply(diffList, abs)
-              normFrob <- lapply(diffList, norm, type = "F")
-              out[b] <- sqrt(Reduce("+", normFrob))
-          }
-##          message("norm:",log(sum(out)))
-          return(log(sum(out)))
-      } else {
-        Q_function(data=data,
-               sigmaList = sigMtxList,
-               xbetaList = xbeta,
-               probTab = pTab,
-               B=B)
-      }
+  Q_function(data=data,
+             sigmaList = sigMtxList,
+             xbetaList = xbeta,
+             probTab = pTab,
+             B=B)
+
 }

@@ -29,6 +29,7 @@
 #' @name aggrmodel_cluster
 #'
 #' @import optimx
+#' @importFrom Matrix bdiag
 #' @importFrom mvnfast dmvn
 #' @export
 #' @examples
@@ -61,7 +62,7 @@ aggrmodel_cluster <- function(formula=NULL,
                               corType = 'exponential',
                               optMethod = "L-BFGS-B",
                               returnFitted = FALSE,
-                              optLk = TRUE,
+                             # optLk = TRUE,
                               sigPar_init = NULL,
                               corPar_init = NULL,
                               diffTol = 1e-6,
@@ -115,8 +116,8 @@ aggrmodel_cluster <- function(formula=NULL,
   beta_init <- unlist(lapply(cl_init[[2]],coef))
   beta_init <- matrix(beta_init, ncol=B)
   if(is.null(sigPar_init)){
-    sigPar_init <- unlist(lapply(cl_init[[2]],function(x) summary(x)$sigma))#/sqrt(I)
-    #sigPar_init <- rep(mean(c(sigPar_init)), times=B)
+    sigPar_init <- unlist(lapply(cl_init[[2]],function(x) summary(x)$sigma))/sqrt(I)
+    sigPar_init <- rep(mean(c(sigPar_init)), times=B)
     if(covType=="Homog") sigPar_init <- rep(sigPar_init,each=C)
   } else
     if(!any(length(sigPar_init)==B,length(sigPar_init==C*B)))
@@ -130,14 +131,14 @@ aggrmodel_cluster <- function(formula=NULL,
     if(!any(length(corPar_init)==B,length(corPar_init==C*B)))
       stop(paste0("corPar_init must have length ",B," or ",C*B))
   cp_in <- c(sigPar_init,corPar_init)
-  # pi_init <- prop.table(table(cluster_init[,2]))
-  # pi_init <- matrix(pi_init, ncol=B)
-  pi_init <- matrix(nrow=J,ncol=B)
-  for(b in 1:B){
-    for(j in 1:J){
-      pi_init[j,b]<-ifelse(cluster_init[j,2]==b,.9,(.1/(B-1)))
-    }
-  }
+  pi_init <- prop.table(table(cluster_init[,2]))
+  pi_init <- matrix(pi_init, ncol=B)
+  # pi_init <- matrix(nrow=J,ncol=B)
+  # for(b in 1:B){
+  #   for(j in 1:J){
+  #     pi_init[j,b]<-ifelse(cluster_init[j,2]==b,.9,(.1/(B-1)))
+  #   }
+  # }
   ## While loop ------
   lkIn <- Inf
   lkDiff = diffTol+1
@@ -161,6 +162,7 @@ aggrmodel_cluster <- function(formula=NULL,
 
   lkVec <- numeric(itMax)
   pi_out <- pi_init
+  my_fct = 0
   while(lkDiff > diffTol & n_it < itMax){
     if(verbose)
       message(paste("\nIteration num ",n_it))
@@ -212,44 +214,12 @@ aggrmodel_cluster <- function(formula=NULL,
     for(b in 1:B){
       dens_b[,b] <- dens_b[,b]*my_constant
       p_jb <- tapply(X = dens_b[,b],INDEX = rep(1:J,each=I),FUN = prod)
-      numerator <- p_jb * pi_init[,b]
+      numerator <- p_jb * pi_init[1,b]
       probTab[,c(b+1)] <- numerator
     }
     denominator_j <- apply(X = probTab[,-1],MARGIN = 1,FUN = sum)
     for(b in 1:B) probTab[,c(b+1)] <- probTab[,c(b+1)]/denominator_j
     ## M-Step ==================================================================
-    if(optLk){
-      sigma_hat = NULL
-    } else{
-      pred <- XLong %*% beta_init
-      sigma_hat <- list()
-      for(b in 1:B){
-        sigma_hat[[b]] <- list()
-        dd$resid <- dd$y - pred[,b]
-        tmp <- by(data = dd,INDICES = grp_rep,FUN = function(df){
-          by(df, df$rep, function(x){
-            out <- list()
-            i <- x$rep[1]
-            j <- x$group[1]
-            rr <- matrix(x$resid,ncol=1)
-#            prb <- subset(probTab,subset = reps==i & grps==j)[,c(2+b)]
-            prb <- probTab[j,c(b+1)]
-            out[[1]] <- prb * (rr %*%t (rr))
-            out[[2]] <- prb
-            out
-          })
-        })
-        upr = lwr = 0
-        for(j in 1:J){
-          for(i in 1:I){
-            id <- subset(dd_order,rep==i&group==j)$id
-            upr <- upr + tmp[[id]][[1]]
-            lwr <- lwr + tmp[[id]][[2]]
-          } # end for i
-          sigma_hat[[b]][[j]] <- upr/lwr
-        } # end for j
-      } # end for b
-    } # end if optLk
     if(verbose) message("Optimizing...")
     if(optMethod=="bobyqa"){
       opt <- optimx::optimx(par = cp_in,
@@ -258,16 +228,16 @@ aggrmodel_cluster <- function(formula=NULL,
                             method = "bobyqa",
                             data = dd,
                             market = market,
-                            optWrap = optLk,
-                            piPar = pi_init,
+                            # optWrap = optLk,
+                            # piPar = pi_init,
                             pTab = probTab,
-                            sCovList = sigma_hat,
+                            # sCovList = sigma_hat,
                             B=B,
                             t=t,
-                            K=n_basis,
+                            # K=n_basis,
                             xbeta =xbeta,
-                            I=I,
-                            J=J,
+                            # I=I,
+                            # J=J,
                             C=C,
                             basisFunction=basisFunction,
                             n_order=n_order,
@@ -277,28 +247,30 @@ aggrmodel_cluster <- function(formula=NULL,
       )
     }
     else{
+      my_step = rep(1e-3/(2^my_fct), times = length(cp_in))
       opt <-optim(par = cp_in,
                   fn = Q_wrapper,
                   lower= rep(1e-4, length(cp_in)),
                   method = "L-BFGS-B",
                   data = dd,
                   market = market,
-                  optWrap = optLk,
-                  piPar = pi_init,
+                  # optWrap = optLk,
+                  # piPar = pi_init,
                   pTab = probTab,
-                  sCovList = sigma_hat,
+                  # sCovList = sigma_hat,
                   B=B,
                   t=t,
-                  K=n_basis,
+                  # K=n_basis,
                   xbeta =xbeta,
-                  I=I,
-                  J=J,
+                  # I=I,
+                  # J=J,
                   C=C,
                   basisFunction=basisFunction,
                   n_order=n_order,
                   covWrap=covType,
                   corWrap=corType,
-                  hessian = TRUE
+                  hessian = TRUE,
+                  control=list(ndeps = my_step)
       )
     }
     lkOut <- opt$value
@@ -311,32 +283,33 @@ aggrmodel_cluster <- function(formula=NULL,
       message("parameters: ", paste(round(cp_out,4),collapse = ","))
     }
     ## Covariance matrices out ----
-    if(covType=='Homog_Uniform'){
-      covPar <- matrix(cp_out, nrow=B)
-      sigMtxList_out <- lapply(1:B, function(b){
-        sig <- covMatrix(market = market,group.name = 'group',
-                         type.name = 'type',mkt.name = 'num',
-                         timeVec = t,sigPar = covPar[b,1],
-                         tauPar = NULL,corPar = covPar[b,2],
-                         funcMtx = NULL,covType = 'Homog_Uniform',
-                         corType = corType,nKnots = NULL,
-                         truncateDec = 8)
-        sig
-      })
-    }
-    if(covType=='Homog'){
-      covPar <- matrix(cp_out, ncol=B,byrow=TRUE)
-      sigMtxList_out <- lapply(1:B, function(b){
-        sig <- covMatrix(market = market,group.name = 'group',
-                         type.name = 'type',mkt.name = 'num',
-                         timeVec = t,sigPar = covPar[1:C,b],
-                         tauPar = NULL,corPar = covPar[(C+1):(2*C),b],
-                         funcMtx = NULL,covType = 'Homog',
-                         corType = corType,nKnots = NULL,
-                         truncateDec = 8)
-        sig
-      })
-    }
+    sigMtxList_out <- sigMtxList
+    # if(covType=='Homog_Uniform'){
+    #   covPar <- matrix(cp_out, nrow=B)
+    #   sigMtxList_out <- lapply(1:B, function(b){
+    #     sig <- covMatrix(market = market,group.name = 'group',
+    #                      type.name = 'type',mkt.name = 'num',
+    #                      timeVec = t,sigPar = covPar[b,1],
+    #                      tauPar = NULL,corPar = covPar[b,2],
+    #                      funcMtx = NULL,covType = 'Homog_Uniform',
+    #                      corType = corType,nKnots = NULL,
+    #                      truncateDec = 8)
+    #     sig
+    #   })
+    # }
+    # if(covType=='Homog'){
+    #   covPar <- matrix(cp_out, ncol=B,byrow=TRUE)
+    #   sigMtxList_out <- lapply(1:B, function(b){
+    #     sig <- covMatrix(market = market,group.name = 'group',
+    #                      type.name = 'type',mkt.name = 'num',
+    #                      timeVec = t,sigPar = covPar[1:C,b],
+    #                      tauPar = NULL,corPar = covPar[(C+1):(2*C),b],
+    #                      funcMtx = NULL,covType = 'Homog',
+    #                      corType = corType,nKnots = NULL,
+    #                      truncateDec = 8)
+    #     sig
+    #   })
+    # }
     ## COMPUTE BETAs ----
     betaSE <- beta_out <- beta_init ## initiate
     for(b in 1:B){
@@ -370,46 +343,38 @@ aggrmodel_cluster <- function(formula=NULL,
                                           nbasis = n_basis)
         }
         Phi = predict(basisObj, t)
-        deltaVec <- matrix(Phi[1,] - Phi[nrow(Phi),],nrow=1)
-        ## Get lambdas
-        ## I can vectorize later (maybe)
-        m1List <- split(x=qr.solve(tmpLeft),
-                        f=rep(1:C, each=n_basis))
-        m2List <- split(x=tmpRight,
-                        f=rep(1:C, each=n_basis))
-        lambda <- matrix(numeric(C),nrow=1)
-        for(c in 1:C){
-          lUp <- deltaVec%*%
-            matrix(m1List[[c]],
-                   nrow=n_basis)[,(n_basis*(c-1)+1):(c*n_basis)]%*%
-            matrix(m2List[[c]],ncol=1)
-          lDown <- deltaVec%*%
-            matrix(m1List[[c]],
-                   nrow=n_basis)[,(n_basis*(c-1)+1):(c*n_basis)]%*%
-            t(deltaVec)
-          lambda[1,c] <- lUp/lDown
-        }
-        Rvec <- lambda %x% deltaVec
-        beta_out[,b] <- as.numeric(solve(tmpLeft, (tmpRight - t(Rvec))))
+        Rvec <- matrix(Phi[1,] - Phi[nrow(Phi),],nrow=1)
+        Rvec <- matrix(1,ncol=C) %x% Rvec
+        lambda <- solve(tmpLeft, tmpRight)
+        lambda <- (Rvec %*% lambda) / (Rvec%*%t(Rvec))
+        lambda <- as.numeric(lambda)
+        beta_out[,b] <- as.numeric(solve(tmpLeft, (tmpRight - lambda*t(Rvec))))
       } else {
         beta_out[,b] <- as.numeric(solve(tmpLeft,tmpRight))
       } ## end if/else cicle
     }
-    pi_out <- probTab[,-1]
-    # pi_out <- apply(probTab[,-c(1:2)],2,mean)
+    # pi_out <- probTab[,-1]
+    pi_out <- apply(probTab[,-c(1)],2,mean)
+    pi_out <- matrix(c(pi_out),ncol=B)
     xbeta_out <- lapply(X, function(x)  x %*% beta_out)
     ## Check convergence & updates
-    lkDiff <- abs(lkIn - lkOut)
-    beta_init <- beta_out
-    pi_init <- pi_out
-    cp_in <- cp_out
-    lkVec[n_it] <- lkOut
-    n_it <- n_it+1
-    lkIn <- lkOut
+    if(lkOut > lkIn){
+      my_fct = my_fct+1
+      n_it <- n_it+1
+      lkDiff = Inf
+    } else{
+      lkDiff <- abs(lkIn - lkOut)
+      beta_init <- beta_out
+      pi_init <- pi_out
+      cp_in <- cp_out
+      lkVec[n_it] <- lkOut
+      n_it <- n_it+1
+      lkIn <- lkOut
+    }
   } # end while loop
   ## OUTPUTS ----
   predList <- XLong %*% beta_out
-  pizao <- apply(pi_out,2,rep,each=T*I)
+  pizao <- apply(pi_out,2,rep,each=T*I*J)
   pred <- numeric(nrow(dd))
   for(b in 1:B)
     pred <- pred + predList[,b]*pizao[,b]
