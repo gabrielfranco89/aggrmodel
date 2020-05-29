@@ -115,9 +115,9 @@ aggrmodel_cluster <- function(formula=NULL,
   beta_init <- unlist(lapply(cl_init[[2]],coef))
   beta_init <- matrix(beta_init, ncol=B)
   if(is.null(sigPar_init)){
-    sigPar_init <- unlist(lapply(cl_init[[2]],function(x) summary(x)$sigma))/sqrt(I)
-    sigPar_init <- rep(mean(c(sigPar_init)), times=B)
-    if(covType=="Homog") sigPar_init <- rep(sigPar_init,C)
+    sigPar_init <- unlist(lapply(cl_init[[2]],function(x) summary(x)$sigma))#/sqrt(I)
+    #sigPar_init <- rep(mean(c(sigPar_init)), times=B)
+    if(covType=="Homog") sigPar_init <- rep(sigPar_init,each=C)
   } else
     if(!any(length(sigPar_init)==B,length(sigPar_init==C*B)))
       stop(paste0("sigPar_init must have length ",B," or ",C*B))
