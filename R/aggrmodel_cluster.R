@@ -61,7 +61,8 @@ aggrmodel_cluster <- function(formula=NULL,
                               covType = 'Homog_Uniform',
                               corType = 'exponential',
                               optMethod = "L-BFGS-B",
-                              returnFitted = FALSE,
+                              returnFitted = TRUE,
+                              returnDesign = TRUE,
                              # optLk = TRUE,
                               sigPar_init = NULL,
                               corPar_init = NULL,
@@ -117,7 +118,8 @@ aggrmodel_cluster <- function(formula=NULL,
   beta_init <- matrix(beta_init, ncol=B)
   if(is.null(sigPar_init)){
     sigPar_init <- unlist(lapply(cl_init[[2]],function(x) summary(x)$sigma))/sqrt(I)
-    sigPar_init <- rep(mean(c(sigPar_init)), times=B)
+    sigPar_init <- rep(mean(sigPar_init),B)
+#    sigPar_init <- rep(mean(c(sigPar_init)), times=B)
     if(covType=="Homog") sigPar_init <- rep(sigPar_init,each=C)
   } else
     if(!any(length(sigPar_init)==B,length(sigPar_init==C*B)))
@@ -198,9 +200,9 @@ aggrmodel_cluster <- function(formula=NULL,
     ## Posteriori probability --------------------------------------------------
     probTab <- matrix(nrow=J,ncol=c(B+1))
     probTab[,1] <- 1:J
-    dens_b <- matrix(nrow=I*J,ncol=B)
+    densities <- matrix(nrow=I*J,ncol=B)
     for(b in 1:B){
-      dens_b[,b] <- by(data = dd,INDICES = rep(1:c(I*J),each=T),FUN = function(dt){
+      densities[,b] <- by(data = dd,INDICES = rep(1:c(I*J),each=T),FUN = function(dt){
         j <- dt$group[1]
         mvnfast::dmvn(
           X = dt$y,
@@ -210,16 +212,72 @@ aggrmodel_cluster <- function(formula=NULL,
         )
       }) # end by
     } # end for b
-    my_constant <- 1/apply(dens_b,1,median)
+    my_constant <- 1/apply(densities,1,max)
     for(b in 1:B){
-      dens_b[,b] <- dens_b[,b]*my_constant
-      p_jb <- tapply(X = dens_b[,b],INDEX = rep(1:J,each=I),FUN = prod)
+      densities[,b] <- densities[,b]*my_constant
+    }
+    # Check for entirely zeros f_jb
+    density_flag <- cbind(densities,my_constant)
+    density_flag <- apply(density_flag,1,function(x){
+      if(is.infinite(c(x[B+1])))
+        x[1:B] <- pi_init
+      else
+        x[1:B]
+    })
+    densities = t(density_flag)
+    for(b in 1:B){
+      p_jb <- tapply(X = densities[,b],INDEX = rep(1:J,each=I),FUN = prod)
       numerator <- p_jb * pi_init[1,b]
       probTab[,c(b+1)] <- numerator
     }
     denominator_j <- apply(X = probTab[,-1],MARGIN = 1,FUN = sum)
     for(b in 1:B) probTab[,c(b+1)] <- probTab[,c(b+1)]/denominator_j
     ## M-Step ==================================================================
+    ## COMPUTE BETAs ------------------------------------------
+    betaSE <- beta_out <- beta_init ## initiate
+    for(b in 1:B){
+      sigInvList <- lapply(sigMtxList[[b]], solve)
+      tmpLeft <- matrix(0,nrow=nrow(beta_out),ncol=nrow(beta_out))
+      tmpRight <- matrix(0,nrow=nrow(beta_out),ncol=1)
+      se <- tmpLeft
+      for(j in 1:J){
+        x_sinv <- t(X[[j]]) %*% sigInvList[[j]]
+        mainLeft <- x_sinv %*%  X[[j]]
+        pjb <- probTab[j,c(b+1)] #subset(probTab,subset = reps==i & grps==j)[,c(2+b)]
+        tmpLeft <- tmpLeft + I*pjb*mainLeft
+        for(i in 1:I){
+          yij <- matrix( dd[dd$group==j&dd$rep==i,"y"], ncol=1)
+          tmpRight <- tmpRight + pjb*(x_sinv %*% yij)
+          bj <- pjb*x_sinv
+          se <- se + bj %*% sigMtxList[[b]][[j]]%*% t(bj)
+        } # end for i
+      } # end for j
+      inv_tl <- solve(tmpLeft)
+      se <- inv_tl %*% se %*% t(inv_tl)
+      betaSE[,b] <- sqrt(diag(se))
+      if(cicleRep){
+        ## Note: Here we use a(0) = a(T) restriction
+        if(basisFunction=='B-Splines')
+          basisObj = create.bspline.basis(range(t),
+                                          nbasis = n_basis,
+                                          norder = n_order)
+        if(basisFunction=='Fourier'){
+          basisObj = create.fourier.basis(range(t),
+                                          nbasis = n_basis)
+        }
+        Phi = predict(basisObj, t)
+        Rvec <- matrix(Phi[1,] - Phi[nrow(Phi),],nrow=1)
+        Rvec <- matrix(1,ncol=C) %x% Rvec
+        lambda <- solve(tmpLeft, tmpRight)
+        lambda <- (Rvec %*% lambda) / (Rvec%*%t(Rvec))
+        lambda <- as.numeric(lambda)
+        beta_out[,b] <- as.numeric(solve(tmpLeft, (tmpRight - lambda*t(Rvec))))
+      } else {
+        beta_out[,b] <- as.numeric(solve(tmpLeft,tmpRight))
+      } ## end if/else cicle
+    }
+    xbeta <- lapply(X, function(x)  x %*% beta_out)
+    ## GET COVARIANCE PARAMETERS --------------------------------
     if(verbose) message("Optimizing...")
     if(optMethod=="bobyqa"){
       opt <- optimx::optimx(par = cp_in,
@@ -282,8 +340,7 @@ aggrmodel_cluster <- function(formula=NULL,
       message(paste("\nlk value:", round(lkOut,6)))
       message("parameters: ", paste(round(cp_out,4),collapse = ","))
     }
-    ## Covariance matrices out ----
-    sigMtxList_out <- sigMtxList
+    # ## Covariance matrices out ----
     # if(covType=='Homog_Uniform'){
     #   covPar <- matrix(cp_out, nrow=B)
     #   sigMtxList_out <- lapply(1:B, function(b){
@@ -310,59 +367,18 @@ aggrmodel_cluster <- function(formula=NULL,
     #     sig
     #   })
     # }
-    ## COMPUTE BETAs ----
-    betaSE <- beta_out <- beta_init ## initiate
-    for(b in 1:B){
-      sigInvList <- lapply(sigMtxList_out[[b]], solve)
-      tmpLeft <- matrix(0,nrow=nrow(beta_out),ncol=nrow(beta_out))
-      tmpRight <- matrix(0,nrow=nrow(beta_out),ncol=1)
-      se <- tmpLeft
-      for(j in 1:J){
-        x_sinv <- t(X[[j]]) %*% sigInvList[[j]]
-        mainLeft <- x_sinv %*%  X[[j]]
-        pjb <- probTab[j,c(b+1)] #subset(probTab,subset = reps==i & grps==j)[,c(2+b)]
-        tmpLeft <- tmpLeft + I*pjb*mainLeft
-        for(i in 1:I){
-          yij <- matrix( dd[dd$group==j&dd$rep==i,"y"], ncol=1)
-          tmpRight <- tmpRight + pjb*(x_sinv %*% yij)
-          bj <- pjb*x_sinv
-          se <- se + bj %*% sigMtxList_out[[b]][[j]]%*% t(bj)
-        } # end for i
-      } # end for j
-      inv_tl <- solve(tmpLeft)
-      se <- inv_tl %*% se %*% t(inv_tl)
-      betaSE[,b] <- sqrt(diag(se))
-      if(cicleRep){
-        ## Note: Here we use a(0) = a(T) restriction
-        if(basisFunction=='B-Splines')
-          basisObj = create.bspline.basis(range(t),
-                                          nbasis = n_basis,
-                                          norder = n_order)
-        if(basisFunction=='Fourier'){
-          basisObj = create.fourier.basis(range(t),
-                                          nbasis = n_basis)
-        }
-        Phi = predict(basisObj, t)
-        Rvec <- matrix(Phi[1,] - Phi[nrow(Phi),],nrow=1)
-        Rvec <- matrix(1,ncol=C) %x% Rvec
-        lambda <- solve(tmpLeft, tmpRight)
-        lambda <- (Rvec %*% lambda) / (Rvec%*%t(Rvec))
-        lambda <- as.numeric(lambda)
-        beta_out[,b] <- as.numeric(solve(tmpLeft, (tmpRight - lambda*t(Rvec))))
-      } else {
-        beta_out[,b] <- as.numeric(solve(tmpLeft,tmpRight))
-      } ## end if/else cicle
-    }
+    ## UPDATE PI's ----------------------------------------------
     # pi_out <- probTab[,-1]
     pi_out <- apply(probTab[,-c(1)],2,mean)
     pi_out <- matrix(c(pi_out),ncol=B)
     xbeta_out <- lapply(X, function(x)  x %*% beta_out)
-    ## Check convergence & updates
+    ## Check convergence & updates ===============================
     if(lkOut > lkIn){
       my_fct = my_fct+1
       n_it <- n_it+1
       lkDiff = Inf
     } else{
+      my_fct <- 0
       lkDiff <- abs(lkIn - lkOut)
       beta_init <- beta_out
       pi_init <- pi_out
@@ -374,7 +390,7 @@ aggrmodel_cluster <- function(formula=NULL,
   } # end while loop
   ## OUTPUTS ----
   predList <- XLong %*% beta_out
-  pizao <- apply(pi_out,2,rep,each=T*I*J)
+  pizao <- apply(probTab[,-1],2,rep,each=T*I)
   pred <- numeric(nrow(dd))
   for(b in 1:B)
     pred <- pred + predList[,b]*pizao[,b]
@@ -407,6 +423,7 @@ aggrmodel_cluster <- function(formula=NULL,
                    mc = mc@x,
                    mc_lwr = mc_lwr@x,
                    mc_upr = mc_upr@x)
+  BIC_value <- 2*min(subset(lkVec, lkVec>0)) - length(c(covPar))*log(I*J)
   ## return -----
   outList <- list("probTab"=probTab,
                   "betaPar" = beta_out,
@@ -415,8 +432,10 @@ aggrmodel_cluster <- function(formula=NULL,
                   "covPar" = covPar,
                   "covParSE" = tryCatch(sqrt(diag(solve(opt$hessian))), error=function(e) e),
                   'mc' = mc,
-                  'lkVec' = lkVec)
+                  'lkVec' = lkVec,
+                  'BIC' = BIC_value)
   if(returnFitted) outList[['fitted']] <- dd
+  if(returnDesign) outList[['X']] <- XLong
   class(outList)='aggrmodel_cluster'
   outList
 }
